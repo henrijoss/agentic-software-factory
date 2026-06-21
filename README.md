@@ -98,6 +98,7 @@ runs.
 ```
 docs/<root>/            ← chosen at `setup`; default `docs/sdlc/`
   index.md              ← SINGLE ENTRY POINT: tree map + ID registry + live phase/gate status
+  settings.json         ← skillset-version pin + execution prefs (system file, no ID)
   constitution.md       ← [CONST]
   spec.md               ← [SPEC]
   requirements/
@@ -117,6 +118,13 @@ docs/<root>/            ← chosen at `setup`; default `docs/sdlc/`
 rename-safe ID → path), and **live status dashboard** (which also records the **last synced commit** for
 drift detection). Cross-references target IDs through `index.md`, never raw paths; a gate-validation step
 fails on any dangling, duplicate, orphan, or unreachable ID.
+
+Beside it, **`settings.json`** pins the skillset `version` the tree was created with (the drivers run a
+semver-aware compatibility check at session start — major mismatch halts) and holds tweakable
+`execution` prefs (`maxSteps`, `verifyMode`, `reviewLoops`). It's a system file written by `setup`/the
+driver bootstrap and read only by `setup`/`continue`/`orchestrator`; phases receive any
+settings-derived value as a provided input, never the file. See the
+[`continue`](skills/continue) base skill for the schema and the `SDLC_SKILLSET_VERSION` constant.
 
 ## Storage
 

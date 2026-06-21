@@ -1,6 +1,6 @@
 ---
 name: setup
-description: One-time project init for the SDLC skillset — choose where the artifact tree is generated and scaffold its single entry point `index.md`. The tree-root location is configurable with a default of `docs/sdlc/`; the operator may pick a different name. Run once at the start of a project, before `constitution`. After setup, every other skill discovers the tree by locating its single `index.md` — no hardcoded path. Idempotent: if a tree already exists, it reports it and never forks a second one. For storage/structure rules it defers to the `continue` base skill.
+description: One-time project init for the SDLC skillset — choose where the artifact tree is generated and scaffold its single entry point `index.md`. The tree-root location is configurable with a default of `docs/sdlc/`; the operator may pick a different name. Run once at the start of a project, before `constitution`. After setup, every other skill discovers the tree by locating its single `index.md` — no hardcoded path. Idempotent: if a tree already exists, it reports it and never forks a second one. Also writes `settings.json` beside `index.md` — the skillset-version pin and execution preferences. For storage/structure rules it defers to the `continue` base skill.
 ---
 
 # Setup (project init)
@@ -37,10 +37,12 @@ lives where it can't go stale — harvested by reference in `constitution`, read
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** the project, and an optional **tree-root name** (default `sdlc`).
+- **Input:** the project, an optional **tree-root name** (default `sdlc`), and optional confirmation of
+  the relevant execution prefs (`verifyMode`, `reviewLoops`).
 - **Output:** the bootstrapped tree root — a minimal `index.md` (tree map + ID registry + status
-  dashboard) at `docs/<root>/`, with status reflecting greenfield vs brownfield (+ stack), ready for
-  the first phase. No other artifact — no code inventory.
+  dashboard) and a `settings.json` (version pin + execution prefs) at `docs/<root>/`, with status
+  reflecting greenfield vs brownfield (+ stack), ready for the first phase. No other artifact — no code
+  inventory.
 
 ## Process
 
@@ -76,10 +78,21 @@ defined by the `continue` base skill (tree map placeholder + empty ID registry +
 status from Step 2: greenfield → `bootstrapped — no phases run yet`; brownfield →
 `bootstrapped (brownfield: <stack>) — no phases run yet`. Initialize `Last synced commit` to the current
 `HEAD` (`git rev-parse HEAD`), or `none` if there is no repo/commit yet — just set the value; the
-template/field is defined by the base skill. Create nothing else — levels materialize when their
+template/field is defined by the base skill. Create no phase artifacts — levels materialize when their
 producing phase runs.
 
-### 5. Hand off
+### 5. Write `settings.json`
+
+Beside `index.md`, write `docs/<root>/settings.json` using the schema/defaults defined by the `continue`
+base skill's *Settings* subsection. Set `version` to `continue`'s `SDLC_SKILLSET_VERSION` (the running
+skillset version — this is the pin downstream drivers check) and `treeRoot` to the location chosen in
+Step 3. Write the full `execution` block with its defaults, and **lightly confirm only the relevant
+prefs in one touch** — `verifyMode` (`test`/`verify`/`both`/`ask`, default `ask`) and `reviewLoops`
+(adversarial `doubt` passes, default `1`). Do not interrogate the operator for every key; the rest are
+defaulted and editable by hand later. Never prompt for `version` — it is taken from the skillset, not
+the operator.
+
+### 6. Hand off
 
 Report the root path and that the project is bootstrapped. Hand off to `constitution` (or whatever the
 operator's entry intent is) — when brownfield, note that `constitution` should **harvest** existing
@@ -96,11 +109,14 @@ Either way there is exactly one tree with one entry point.
 
 - Creating a second `index.md` when one already exists (forking the tree) instead of reporting it.
 - Hardcoding `docs/sdlc/` as if immutable — it is the **default**, not the only, location.
-- Scaffolding artifacts beyond the minimal `index.md` (the driver writes them as phases run).
+- Scaffolding artifacts beyond the minimal `index.md` + `settings.json` (the driver writes the rest as
+  phases run).
 - Writing a current-state / code-inventory artifact in setup — a staleness bomb; setup owns no
   artifact, and existing code is read live by `design`, referenced by `constitution`.
 - Turning the orient glance into a deep codebase analysis (that's `constitution` harvest / `design`).
 - Redefining the tree structure here instead of deferring to the `continue` base skill.
+- Omitting `settings.json`, or prompting for `version` / interrogating the operator for every key —
+  `version` comes from the skillset, and only the relevant prefs are lightly confirmed; the rest default.
 
 ## Verification
 
@@ -108,7 +124,9 @@ Either way there is exactly one tree with one entry point.
 - [ ] Orient glance ran read-only; greenfield/brownfield (+ stack) reflected in `index.md` status only.
 - [ ] No code inventory / current-state artifact written.
 - [ ] Tree root chosen as `docs/<root>/` (default `sdlc`); location confirmed with the operator.
-- [ ] A single minimal `index.md` created at the chosen location (and nothing else), with
-      `Last synced commit` initialized to current `HEAD` (or `none`).
+- [ ] A single minimal `index.md` created at the chosen location, with `Last synced commit` initialized
+      to current `HEAD` (or `none`) — and no phase artifacts.
+- [ ] `settings.json` written beside it: `version` = `SDLC_SKILLSET_VERSION`, `treeRoot` = chosen root,
+      full `execution` block defaulted; only the relevant prefs lightly confirmed, `version` not prompted.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.

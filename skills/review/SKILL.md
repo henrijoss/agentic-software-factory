@@ -31,7 +31,8 @@ adversarial review, `review` **invokes `doubt`** for the deep correctness pass a
 
 - **Input:** the implemented + verified slice (code/diff, its **Tasks**, the **SessionSummary** for
   what changed), plus the **Spec/Requirement**, the **Plan**, and the **Constitution** to review
-  against — all provided by the caller.
+  against — all provided by the caller. If the caller provides a **doubt-pass count**, run that many
+  `doubt` passes on the correctness pass; otherwise use your own judgment.
 - **Output:** findings + a disposition each, emitted per the result contract. No new artifact and no
   SDLC storage — the driver records the gate state. Each finding carries a routing hint (rework → back
   to `implement`; a stale upstream artifact → back to `specify`/`design`); the driver routes.

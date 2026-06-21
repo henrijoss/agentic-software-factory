@@ -29,6 +29,19 @@ step needs, so the next step can (and for long unattended runs, should) start fr
 fresh context**. `references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and the
 non-interactive loop-control contract below.
 
+## Skillset version
+
+```
+SDLC_SKILLSET_VERSION = 0.1.0
+```
+
+This is the **single source of truth** for the running skillset's version — the version of the
+artifact-tree *contract* this skillset defines. It lives here because `continue` is the definer of that
+contract, and both other system skills load/defer to it (`setup` for structure, `orchestrator` as its
+base). Bumping the skillset = editing this one line (semver: `major.minor.patch`). A project records the
+version it was created/migrated with in its `settings.json` (below); the drivers compare the two at
+session start (see the **version-compat check** in Process).
+
 ## When to Use
 
 - **Resume:** continue a project from where `index.md`'s status dashboard left off — run the next step.
@@ -83,6 +96,41 @@ parallel copy. Git history carries the versioning.
 The full storage-binding table (abstract artifact → read/write op) and the **optional GitHub edge
 integrations** (`maintain` inbound, optional one-way mirror — not a backend) live in
 `references/artifact-io.md`.
+
+### Settings (`settings.json` — a system file beside `index.md`)
+
+A single `settings.json` sits **next to `index.md`** at `docs/<root>/settings.json`, versioned with the
+tree. It pins the skillset version the tree was created/migrated with and holds tweakable execution
+preferences. It is a **system file**, not an abstract artifact: **only the system skills (`setup`,
+`continue`, `orchestrator`) read or write it.** Phase skills never see it — anything that must influence
+a phase is passed to it as a plain input by the driver (see `references/handoff.md`).
+
+```json
+{
+  "version": "0.1.0",
+  "treeRoot": "docs/sdlc",
+  "execution": {
+    "maxSteps": 50,
+    "verifyMode": "ask",
+    "reviewLoops": 1
+  }
+}
+```
+
+- `version` — the `SDLC_SKILLSET_VERSION` that created or last migrated this tree. Written at init,
+  checked by the drivers at session start, auto-bumped forward on a safe (same-major, newer) run.
+- `treeRoot` — the resolved root path (`docs/<root>`). Confirms — does not replace — discovery, and lets
+  `loop.sh`/drivers skip the search.
+- `execution.maxSteps` — default step cap for the fresh-process loop (`loop.sh` reads it; the `MAX_STEPS`
+  env var still overrides).
+- `execution.verifyMode` — `test | verify | both | ask`; the default for the `verify`/`test` node so the
+  driver needn't ask each slice (`ask` = prompt as before).
+- `execution.reviewLoops` — number of adversarial `doubt` passes per non-trivial decision; the driver
+  passes it as an input to `design`/`implement`/`review`.
+
+**Forward-compatible:** unknown keys are ignored and any missing key falls back to the default above, so
+new settings can be added without breaking older trees. `setup` writes the full file with defaults and
+only lightly confirms the relevant prefs; everything else is edited by hand later.
 
 ## Structural invariants (the tree)
 
@@ -157,10 +205,27 @@ live in `references/phase-graph.md`.
 
 ## Process (default: run the next single step)
 
-### 1. Resolve the tree root
+### 1. Resolve the tree root, read settings, check the version
 
 Locate the tree per "Resolve the tree root" above (discover the single `index.md`). If none exists,
-run `setup` — or, as a fallback, create the default `docs/sdlc/` root idempotently.
+run `setup` — or, as a fallback, create the default `docs/sdlc/` root idempotently **and** write a
+default `settings.json` beside it (current `SDLC_SKILLSET_VERSION`, `treeRoot` = the resolved root,
+default `execution`). Never overwrite an existing `settings.json`.
+
+Then read `settings.json` and run the **version-compat check** — compare its `version` (recorded `S`)
+against `SDLC_SKILLSET_VERSION` (running `R`), as `major.minor.patch`:
+
+- **`R.major != S.major`** → **halt**: incompatible tree structure; require an explicit
+  migration/override decision before any phase runs. (Headless: `halt: version mismatch <S> vs <R>`.)
+- **same major, `R > S`** (running newer) → proceed, and **bump** `settings.version` to `R` (record the
+  forward migration).
+- **same major, `R < S`** (running older than the tree) → **warn** and proceed (same major = compatible
+  structure; surface that the tree was last touched by a newer skillset).
+- **`R == S`** → proceed.
+
+Honor `treeRoot` from settings to confirm the discovered root. A missing/unparseable `settings.json` on
+an existing tree is treated as "unknown version" — write a fresh default (recording `R`) rather than
+blocking. Any missing key falls back to its default.
 
 ### 2. Read where the project stands
 
@@ -188,12 +253,16 @@ graceful degradation, gate wording, routing, example) lives in `references/sync.
 
 From the status dashboard + the phase graph, pick the **single** next phase. If a single one-off skill
 was requested, defer to that phase skill directly. When the next phase isn't unambiguous, confirm with
-the user rather than guessing (see entry modes in `references/phase-graph.md`).
+the user rather than guessing (see entry modes in `references/phase-graph.md`). At the **`verify`/`test`
+node**, use `settings.execution.verifyMode` to pick `test` / `verify` / both without asking — unless it
+is `ask` (prompt as usual).
 
 ### 5. Assemble inputs, then run exactly one phase
 
 **Assemble** the phase's inputs from the tree (`[CONST]`, the prior artifact on re-entry, the chosen
 `[REQ-n]`, …) per the consumed-by mapping in `references/handoff.md`, and pass them as provided content.
+For `design`/`implement`/`review`, also pass `settings.execution.reviewLoops` as a plain input (the
+adversarial `doubt`-pass count) — the phase honors it without ever reading `settings.json`.
 Then load and run that one phase skill. It is a pure transform: it does its work (invoking postures as
 needed), and **emits its result** — an in-context result block (phase skills) or `.sdlc/scratch/` files
 (`to-*` skills). It does **not** touch the tree, `index.md`, or IDs. Do not pre-empt the phase's logic.
@@ -240,11 +309,19 @@ tree levels a job needs ever materialize.
   decision a human owes. When in doubt, `halt`.
 - Carrying one step's working-context into the next instead of resuming cold from `index.md` — the
   ever-growing-session failure mode at step granularity.
+- Running a phase without the version-compat check, or auto-advancing past a **major** version mismatch
+  instead of halting for a migration/override decision.
+- Letting a phase skill read `settings.json` directly instead of receiving settings-derived values as
+  provided inputs — only `setup`/`continue`/`orchestrator` touch the file.
 
 ## Verification
 
 - [ ] Tree root resolved by discovering the single `index.md` (or `setup`/fallback ran) before any
-      phase — no hardcoded `docs/sdlc/` assumption.
+      phase — no hardcoded `docs/sdlc/` assumption; `settings.json` read (or default-written on
+      fallback) and the version-compat check run before any phase — major mismatch halted, same-major
+      newer bumped the recorded version.
+- [ ] Settings applied by the driver only: `verifyMode` chose the verify/test node, `reviewLoops` passed
+      as a phase input — no phase skill read `settings.json`.
 - [ ] Status dashboard read; the single next phase chosen from the phase graph (or one-off deferred).
 - [ ] Sync check run; any drift (`HEAD` != recorded) surfaced at the sync gate and reconciled, then
       `Last synced commit` updated to `HEAD` (or `none` when git is absent).

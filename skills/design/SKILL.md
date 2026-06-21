@@ -30,7 +30,8 @@ breakdown leak into design conflates the two halves the architecture deliberatel
 ## Inputs / Outputs (abstract)
 
 - **Input:** one **Requirement**, the **Constitution** (always), and any prior **Plan** when
-  re-entering — all provided by the caller.
+  re-entering — all provided by the caller. If the caller provides a **doubt-pass count**, run that many
+  `doubt` passes on non-trivial decisions; otherwise use your own judgment.
 - **Output:** the **Plan**, emitted per the result contract for the caller to ingest. The skill writes
   no files and resolves no storage.
 

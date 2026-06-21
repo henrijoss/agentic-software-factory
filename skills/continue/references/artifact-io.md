@@ -125,6 +125,14 @@ from `setup`, never a code inventory.) `Last synced commit` is the git `HEAD` th
 against; the driver maintains it via the sync check (see the `continue` base skill and
 `references/sync.md`).
 
+**`settings.json` (system file, beside `index.md`).** `docs/<root>/settings.json` pins the skillset
+version the tree was created/migrated with and holds tweakable execution preferences (schema + defaults
+in the `continue` base skill's *Settings* subsection). It is **not** an abstract artifact — it has no
+ID, no entry in the table above, and no phase produces or consumes it. Only the system skills read/write
+it: `setup` writes it at init, the driver bootstrap creates a default one alongside the fallback
+`index.md`, and the drivers read it (version-compat check + settings) at session start. Phase skills
+receive any settings-derived value as a provided input, never the file.
+
 ## GitHub issues — optional edge integrations (not a backend)
 
 GitHub issues are **not** a storage backend for the tree. The artifact tree never lives in issues: it

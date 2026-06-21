@@ -100,5 +100,12 @@ which phase comes from the **consumed-by** column of the artifact table in
 | `deploy` | the reviewed change, `[CONST]` |
 | `maintain` | live-signal sources declared in `[CONST]` |
 
+For `design`, `implement`, and `review`, the driver **also** passes
+`settings.execution.reviewLoops` (the adversarial `doubt`-pass count) as a plain
+provided input — "run N `doubt` passes on non-trivial decisions". This is the seam
+that keeps phases settings-unaware: the phase honors a numeric input exactly like it
+consumes `[CONST]`, and never reads `settings.json` (only the system skills do). If
+the driver provides no count, the phase uses its own judgment.
+
 Standalone (no driver): the user supplies inputs directly; the transform just runs on
 what it's given. This is what makes every non-system skill independently invocable.

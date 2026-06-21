@@ -37,7 +37,8 @@ top failure mode).
 
 - **Input:** the slice's **Tasks**, the **Plan** for context, the **Constitution** (commands,
   boundaries — resolve commands there, never hardcode), and the prior **SessionSummary** when resuming
-  — all provided by the caller.
+  — all provided by the caller. If the caller provides a **doubt-pass count**, run that many `doubt`
+  passes on non-trivial decisions; otherwise use your own judgment.
 - **Output:** working **code**, written directly to the source tree (that is the skill's real work),
   plus an updated **SessionSummary** emitted per the result contract for the caller to ingest. The
   skill writes code, but resolves no SDLC storage and does not touch the artifact tree/index itself.

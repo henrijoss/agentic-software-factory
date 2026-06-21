@@ -147,6 +147,7 @@ by locating the single `index.md` — no skill hardcodes the path.
 ```
 docs/<root>/          ← chosen at `setup`; default `docs/sdlc/`
   index.md            ← SINGLE ENTRY POINT: tree map + ID registry + live phase/gate status
+  settings.json       ← skillset-version pin + execution prefs (system file, no ID)
   constitution.md     ← standing principles (read by every phase)        [ID: CONST]
   spec.md             ← Specification                                     [ID: SPEC]
   requirements/
@@ -177,6 +178,17 @@ enforces "no stale references" and complements the in-place-update anti-stalenes
 **Optional levels.** A tiny change may create only `index.md` + `spec.md` + a task; the
 `requirements/` layer appears only when `to-requirements` runs. The single-entry-point invariant
 holds at every size.
+
+**Settings & versioning.** `settings.json` sits beside `index.md` and is a **system file** (no ID, not
+an artifact): only `setup`/`continue`/`orchestrator` read or write it. It pins the `version` the tree
+was created/migrated with — the drivers run a **semver-aware compatibility check** at session start
+(major mismatch halts for a migration/override; same-major-newer bumps the recorded version forward;
+same-major-older warns) — plus tweakable `execution` prefs: `maxSteps` (the `loop.sh` step cap),
+`verifyMode` (`test`/`verify`/`both`/`ask`), and `reviewLoops` (adversarial `doubt` passes). `setup`
+writes it with defaults and lightly confirms only the relevant prefs; the rest are edited by hand.
+Settings-derived values reach a phase as **provided inputs** (e.g. the driver passes `reviewLoops` to
+`design`/`implement`/`review`) — no phase ever reads the file. The running version itself is the single
+constant `SDLC_SKILLSET_VERSION` in the `continue` base skill.
 
 **Delta-only, code is source of truth.** Artifacts describe the **change to make** (the delta), never a
 restatement of the existing code. Existing code is the source of truth: read **live** by `design`

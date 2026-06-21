@@ -47,7 +47,11 @@ instruction-budget discipline holds: only the active phase's `SKILL.md` is in co
 
 Load the `continue` base skill for the artifact tree, storage, root resolution, gate-validation, the
 phase graph, and the **sync/drift check** (`references/sync.md`). Resolve the tree root (discover the
-single `index.md`; if none, `setup` or the fallback creates the default `docs/sdlc/` root). Run the
+single `index.md`; if none, `setup` or the fallback creates the default `docs/sdlc/` root + a default
+`settings.json`). The **version-compat check** and settings reads come for free here too — `continue`
+runs them at session start; a **major** version mismatch holds like any other gate (no auto-advance
+until migrated/overridden), and the configured `verifyMode`/`reviewLoops` flow through the base skill's
+phase-graph and input-assembly logic. Run the
 sync check at session start; if external commits since `Last synced commit` are detected, hold the sync
 gate and reconcile **before** advancing — like every gate, no auto-advance past unresolved drift.
 Resolve the entry mode
@@ -122,8 +126,9 @@ actually needs; no phase or tree level is mandatory.
 
 ## Verification
 
-- [ ] Structure, graph, bootstrap, gate-validation, and the sync/drift check deferred to the `continue`
-      base skill; sync check run at session start, drift (if any) reconciled at its gate before advancing.
+- [ ] Structure, graph, bootstrap, gate-validation, the version-compat check, and the sync/drift check
+      deferred to the `continue` base skill; version checked and sync check run at session start, a major
+      version mismatch held (not auto-advanced), drift (if any) reconciled at its gate before advancing.
 - [ ] Entry mode resolved; single steps deferred to `continue`, single one-offs to the phase skill.
 - [ ] `index.md` entry point ensured (bootstrap idempotent) before any phase ran.
 - [ ] Exactly one phase skill loaded/run at a time, in graph order.
