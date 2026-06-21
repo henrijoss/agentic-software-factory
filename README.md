@@ -11,11 +11,18 @@ every phase of the software lifecycle and chain together through **human gates**
 - **Iterative, not waterfall.** The unit of iteration is one **vertical slice / use-case**. The loop
   is a cycle closed by `maintain → specify`.
 - **Anti-staleness by in-place update.** Re-entering a phase overwrites *that phase's* artifact — one
-  source of truth, so spec and code cannot silently diverge.
+  source of truth, so spec and code cannot silently diverge. (The phase re-emits the artifact; the
+  driver's ingest does the in-place overwrite.)
+- **Drift sync against git.** `index.md` records the last commit the system reconciled against; at every
+  `continue`/`orchestrator` start the driver compares it to `HEAD` and, on external commits made between
+  sessions, holds a **sync gate** to reconcile open work (some tasks may already be resolved). Closes
+  the blind spot in-place update alone can't see.
 - **A human gate on every transition.** Each gate must surface a real decision, never "looks good?".
-- **Base skill + thin drivers, standalone skills.** A `continue` base skill defines the structure and
-  is loaded whenever working in the system; it is the default driver (next step, then stop), with
-  `orchestrator` as the opt-in full-loop variant. Every skill is also directly invocable on its own.
+- **Base/init skills + thin drivers, pure standalone skills.** Only `setup`, the `continue` base skill
+  (default driver — next step, then stop), and `orchestrator` (opt-in full-loop) know the tree/IDs/
+  storage/chaining. Every other skill is a **pure transform**: it takes inputs the driver provides and
+  **emits a result**; the driver assembles inputs before and ingests the result after. So every skill
+  is directly invocable on its own — standalone it just emits its result and creates no tree.
 - **Lean.** Each skill is a small operational core (depth in its `references/`); a driver loads
   **one phase at a time** to stay within the model's reliable instruction budget.
 
@@ -102,14 +109,17 @@ docs/<root>/            ← chosen at `setup`; default `docs/sdlc/`
 ```
 
 `index.md` is the root object and plays three roles at once: **tree map**, **ID registry** (stable,
-rename-safe ID → path), and **live status dashboard**. Cross-references target IDs through `index.md`,
-never raw paths; a gate-validation step fails on any dangling, duplicate, orphan, or unreachable ID.
+rename-safe ID → path), and **live status dashboard** (which also records the **last synced commit** for
+drift detection). Cross-references target IDs through `index.md`, never raw paths; a gate-validation step
+fails on any dangling, duplicate, orphan, or unreachable ID.
 
 ## Storage
 
-Skills never hardcode storage — the structure and every artifact read/write are owned by the
-[`continue`](skills/continue) base skill (see its
-[`references/artifact-io.md`](skills/continue/references/artifact-io.md)). The canonical store is **local
+Non-system skills never touch storage — they emit a **result** and the driver persists it. The
+structure and every artifact read/write are owned by the [`continue`](skills/continue) base skill (see
+its [`references/artifact-io.md`](skills/continue/references/artifact-io.md) for the storage binding and
+[`references/handoff.md`](skills/continue/references/handoff.md) for the result contract, the
+`.sdlc/scratch/` convention used by `to-*` skills, and the assemble/ingest seam). The canonical store is **local
 files**, versioned with code (the tree above) — there is no swappable backend: keeping the artifact tree
 in git is what gives atomic spec+code commits, branch-per-slice state, and the in-place diff that powers
 anti-staleness. **GitHub issues** are an optional *edge integration*, not a backend — `maintain` can

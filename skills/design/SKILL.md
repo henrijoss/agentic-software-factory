@@ -29,16 +29,16 @@ breakdown leak into design conflates the two halves the architecture deliberatel
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** one **Requirement** `[REQ-n]`, the **Constitution** `[CONST]` (always), and any prior
-  **Plan** when re-entering. Treat the Requirement as an abstract input per the `continue` base skill.
-- **Output:** the **Plan** artifact `[ID: REQ-n.DESIGN]`. Storage resolves through
-  the `continue` base skill (default: `requirements/REQ-<n>/design.md`, registered in `index.md`).
+- **Input:** one **Requirement**, the **Constitution** (always), and any prior **Plan** when
+  re-entering — all provided by the caller.
+- **Output:** the **Plan**, emitted per the result contract for the caller to ingest. The skill writes
+  no files and resolves no storage.
 
 ## Process
 
 ### 1. Read context, investigate read-only
 
-Read `[CONST]` and the Requirement `[REQ-n]` (and the prior Plan if re-entering). Investigate the
+Read the **Constitution** and the **Requirement** (and the prior Plan if re-entering). Investigate the
 codebase **read-only**: identify existing patterns, conventions, and components to design *with*, not
 against. Map where this requirement touches the system. This read **is** the system's home for
 fine-grained current state — done live on every entry, so it cannot go stale; design against the actual
@@ -62,16 +62,16 @@ Before the plan stands, run the **`doubt` posture** on any non-trivial architect
 boundary crossings, irreversible choices, properties the compiler can't verify, decisions made under
 uncertainty. Fold findings back into the approach.
 
-### 5. Write the Plan in place
+### 5. Emit the result
 
-Write the Plan via artifact-io (default `requirements/REQ-<n>/design.md`), register `REQ-n.DESIGN` in
-`index.md`. Re-entry **overwrites the file in place** — never fork a second design.
+Emit the Plan per the result contract — the body plus its gate decision — for the caller to ingest.
+Write no files and resolve no storage; persistence and any re-entry overwrite are the driver's job.
 
-### 6. Gate → to-tasks
+### 6. Gate
 
-Present the Plan and force the decision: *"Is the approach and architecture sound, and are the risks
-acceptable?"* This gate earns its interruption: tasks and code commit to this approach. On explicit
-approval, hand off to `to-tasks`.
+Force the decision: *"Is the approach and architecture sound, and are the risks acceptable?"* This gate
+earns its interruption: tasks and code commit to this approach. Surface it for the caller — standalone,
+present it to the user; under a driver, the driver holds the gate.
 
 ## Artifact shape
 
@@ -79,7 +79,7 @@ Short form below; template, the design-vs-tasks boundary, and a worked example l
 `references/design-guide.md`.
 
 ```markdown
-# Design — [REQ-n: requirement title]
+# Design — [requirement title]
 
 ## Approach
 [How it will be built, in a few sentences. The shape of the solution.]
@@ -108,7 +108,7 @@ the reader's budget at the gate and downstream.
 - Asserting a non-trivial decision is sound without running `doubt`.
 - Key decisions with no rationale / no rejected alternative.
 - Writing code during design.
-- Forking a second design on re-entry instead of updating in place.
+- Writing files / resolving storage instead of just emitting the result (that's the driver's job).
 
 ## Verification
 
@@ -117,6 +117,5 @@ the reader's budget at the gate and downstream.
 - [ ] Key decisions carry rationale (and the alternative rejected).
 - [ ] Risks and unknowns surfaced with mitigations.
 - [ ] `doubt` run on non-trivial decisions before the plan stood.
-- [ ] Written via artifact-io as `REQ-n.DESIGN`, registered in `index.md`.
-- [ ] Re-entry updated the file in place — no duplicate artifact.
-- [ ] The gate decision was posed and explicit approval received before handing to `to-tasks`.
+- [ ] Emitted per the result contract; no files written / no storage resolved by the skill.
+- [ ] The gate decision was posed (caller/driver holds it).

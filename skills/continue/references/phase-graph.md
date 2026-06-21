@@ -21,6 +21,9 @@ constitution → specify → to-requirements → clarify → design → to-tasks
   which applies.
 - **Transition skills (`to-requirements`, `to-tasks`) fan out** and pause for user feedback as part of
   their own gate — a driver just holds that gate like any other.
+- **At each node the driver assembles inputs before and ingests the result after.** Phase/transition
+  skills are pure transforms emitting a result; the driver gathers their inputs from the tree and
+  persists their output into it (see `references/handoff.md`). The graph only sequences nodes.
 
 ## Gate decisions (what each arrow forces)
 
@@ -54,6 +57,10 @@ even within a driven session; review approval ≠ ship approval.
 
 When the start phase isn't unambiguous from `index.md`, confirm with the user rather than guessing.
 
+At session start — after resolving the tree root, before determining the start/next phase — both
+drivers run the **sync check** (`references/sync.md`): compare `index.md`'s `Last synced commit` to
+`HEAD` and, on external drift, hold the sync gate to reconcile before walking the graph.
+
 On a **brownfield** project (status set by `setup`), **Full project** entry still starts at
 `constitution` — which harvests existing standing docs and captures existing-system facts by reference —
 then `specify`, which scopes the first slice as a delta against existing behavior. The graph is
@@ -68,7 +75,9 @@ artifact. The root is **discovered**, and creation is **idempotent**:
    `index.md` once at project start, with status reflecting greenfield vs brownfield (+ stack).
 2. **A driver resolves/falls back.** At session start, discover the single `index.md`; if none exists,
    create the **default** `docs/sdlc/` minimal root. An existing tree is left untouched — never forked.
-3. **Phase skills fall back the same way** when run standalone (e.g. `constitution`).
+
+Only `setup` and the two drivers create/write the tree. A standalone phase/transition skill creates no
+tree — it emits a result the operator ingests by running `continue`.
 
 The discovery rule, minimal root, and full rationale live in the `continue` base skill and
 `references/artifact-io.md`. This keeps the four invariants (single entry point / single tree / ID

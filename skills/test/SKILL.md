@@ -31,11 +31,11 @@ calculations, state machines) and bug fixes; `verify` for UI/integration/"does i
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** a change/slice plus its **Task** acceptance criteria, and `[CONST]` for the test
-  framework and commands (resolve them there — never hardcode).
-- **Output:** automated **tests in the source tree** (per `[CONST]` conventions) and a pass/fail
-  result. No dedicated tree artifact — the result is recorded as gate state in `index.md` and noted in
-  the SessionSummary.
+- **Input:** a change/slice plus its **Task** acceptance criteria, and the **Constitution** for the
+  test framework and commands (resolve them there — never hardcode) — all provided by the caller.
+- **Output:** automated **tests in the source tree** (per the Constitution's conventions — the skill's
+  real work) and a pass/fail result, emitted per the result contract. No dedicated artifact and no SDLC
+  storage — the driver records the gate state.
 
 ## Process
 
@@ -60,10 +60,11 @@ Honor the constitution's simplicity default — refactor toward simplest-that-wo
 Add cases for the boundaries and failure modes the contract implies (empty/null, limits, error
 paths) — not every theoretical input. Each case must earn its place; over-testing is its own cost.
 
-### 5. Gate → review
+### 5. Gate
 
-Run the suite (commands from `[CONST]`). When the task's tests are green, force the decision: *"Is
-the contract confirmed and ready for adversarial review?"* On explicit approval, hand off to `review`.
+Run the suite (commands from the **Constitution**). When the task's tests are green, force the
+decision: *"Is the contract confirmed and ready for adversarial review?"* Surface it for the caller —
+standalone, present it to the user; under a driver, the driver holds the gate.
 
 ## Composability (big↔small)
 
@@ -78,7 +79,7 @@ Don't manufacture a test pyramid for a one-line fix.
 - A test that passed the first time it ran — it never went RED, so it asserts nothing.
 - Writing code beyond what a test demands.
 - Testing implementation details instead of the contract (brittle to refactor).
-- Hardcoding the test command instead of resolving from `[CONST]`.
+- Hardcoding the test command instead of resolving from the **Constitution**.
 - Reaching for `test` on UI/visual/integration behavior — use `verify`.
 
 ## Verification
@@ -87,6 +88,6 @@ Don't manufacture a test pyramid for a one-line fix.
 - [ ] Only the minimum code to pass was written (GREEN), then cleaned under green (REFACTOR).
 - [ ] Edge/failure cases that the contract implies are covered; no over-testing.
 - [ ] Tests assert the contract, not implementation details.
-- [ ] Commands resolved from `[CONST]`; suite green.
+- [ ] Commands resolved from the **Constitution**; suite green.
 - [ ] Bug fixes began with a failing reproduction.
-- [ ] The gate decision was posed and explicit approval received before handing to `review`.
+- [ ] The gate decision was posed (caller/driver holds it).

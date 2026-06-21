@@ -48,8 +48,7 @@ such and prefer escalation whenever the user is reachable.
 ## Inputs / Outputs (abstract)
 
 - **Input:** the artifact under scrutiny (a diff, a design proposal, an assertion) plus the contract
-  it must satisfy. Pull the contract from the relevant artifact — the Plan `[REQ-n.DESIGN]`, Task,
-  or Spec — via the `continue` base skill.
+  it must satisfy, provided by the caller — the relevant Plan, Task, or Spec.
 - **Output:** none of its own; classified findings handed back to the calling phase.
 
 ## Process

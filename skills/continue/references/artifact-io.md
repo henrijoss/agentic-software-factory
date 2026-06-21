@@ -1,10 +1,13 @@
 # Artifact I/O Binding (depth)
 
 Loaded on demand by the `continue` base skill. The single place that maps **abstract artifacts** used
-by the SDLC skillset to concrete **storage operations**. Skills reference artifacts abstractly ("read
-the Requirement", "write N Tasks") and resolve *how* to store/retrieve them here — not in the individual
-skills. The artifact tree, invariants, and bootstrap are summarized in the `continue` `SKILL.md`; this
-file carries the storage binding for the canonical **local-files** store, plus the **optional GitHub edge
+by the SDLC skillset to concrete **storage operations**. Only the system skills (`setup`, `continue`,
+`orchestrator`) read this binding: the **driver** resolves *how* to store/retrieve an artifact here
+during **input-assembly** (uses the *Consumed by* column to gather a phase's inputs) and **ingest**
+(uses the *Produced by* column + the storage table to persist an emitted result). Phase/transition
+skills never touch storage — they emit a result per the contract (see `references/handoff.md`). The
+artifact tree, invariants, and bootstrap are summarized in the `continue` `SKILL.md`; this file carries
+the storage binding for the canonical **local-files** store, plus the **optional GitHub edge
 integrations**.
 
 ## Abstract artifacts
@@ -98,12 +101,12 @@ any artifact is written. The root is **discovered** (the one SDLC `index.md`, de
 2. **A driver resolves/falls back.** At session start the `continue` base skill (or `orchestrator`)
    discovers the single `index.md`; if none exists (no `setup` run), it creates the **default**
    `docs/sdlc/` minimal root. Idempotent — an existing tree is left untouched, never forked.
-3. **Phase skills are the last-resort fallback.** A phase skill run standalone resolves the root the
-   same way before writing its first artifact (e.g. `constitution`).
 
-So the entry point is guaranteed whether the project starts fresh, mid-loop, or from a single skill,
-and the root location is configurable — keeping the four invariants satisfiable from the very first
-write. Minimal root:
+Only `setup` and the two drivers ever create or write the tree. A phase/transition skill run standalone
+creates **no** tree — it just emits its result; the operator runs `continue` afterward to ingest it.
+So the entry point is guaranteed whether the project starts fresh, mid-loop, or from a single driven
+step, and the root location is configurable — keeping the four invariants satisfiable from the very
+first write. Minimal root:
 
 ```markdown
 # SDLC Index — [project]
@@ -114,10 +117,13 @@ write. Minimal root:
 |----|------|--------|
 ## Status
 Project: bootstrapped — no phases run yet.
+Last synced commit: <sha | none>
 ```
 
 (Brownfield projects read `bootstrapped (brownfield: <stack>) — no phases run yet` — a one-line signal
-from `setup`, never a code inventory.)
+from `setup`, never a code inventory.) `Last synced commit` is the git `HEAD` the system last reconciled
+against; the driver maintains it via the sync check (see the `continue` base skill and
+`references/sync.md`).
 
 ## GitHub issues — optional edge integrations (not a backend)
 

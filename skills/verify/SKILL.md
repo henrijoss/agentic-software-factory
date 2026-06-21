@@ -30,11 +30,11 @@ input/output contracts and bug fixes; **both** for high-stakes cross-boundary wo
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** a change/slice plus its **Task** acceptance criteria, and `[CONST]` for how to build,
-  launch, and exercise the app (resolve there — never hardcode).
+- **Input:** a change/slice plus its **Task** acceptance criteria, and the **Constitution** for how to
+  build, launch, and exercise the app (resolve there — never hardcode) — all provided by the caller.
 - **Output:** **observed evidence** that behavior meets (or fails) the acceptance criteria, and a
-  pass/fail result. No dedicated tree artifact — the result is recorded as gate state in `index.md`
-  and noted in the SessionSummary.
+  pass/fail result, emitted per the result contract. No dedicated artifact and no storage — the driver
+  records the gate state.
 
 ## Process
 
@@ -46,7 +46,7 @@ Before running anything, write the observable pass condition from the task's acc
 
 ### 2. Run the real thing
 
-Build and launch per `[CONST]` and exercise the actual path a user/caller would. Verify against the
+Build and launch per the **Constitution** and exercise the actual path a user/caller would. Verify against the
 real artifact, not a description of it or a mock that assumes the answer.
 
 ### 3. Observe against the pass condition
@@ -60,10 +60,11 @@ screenshot, the observed sequence) so the gate decision rests on fact, not asser
 If behavior doesn't match, report it faithfully with the evidence and hand back to `implement`. Never
 relax the pass condition to make it pass, and never claim "verified" on a step you skipped.
 
-### 5. Gate → review
+### 5. Gate
 
 When behavior is confirmed, force the decision: *"Is behavior confirmed and ready for adversarial
-review?"* On explicit approval, hand off to `review`.
+review?"* Surface it for the caller — standalone, present it to the user; under a driver, the driver
+holds the gate.
 
 ## Composability (big↔small)
 
@@ -79,13 +80,13 @@ Don't spin up a full e2e harness for a one-screen visual check.
 - Skipping the negative/edge case the task implies.
 - Relaxing the pass condition to turn a fail into a pass.
 - Reaching for `verify` on a pure logic contract — use `test`.
-- Hardcoding build/launch commands instead of resolving from `[CONST]`.
+- Hardcoding build/launch commands instead of resolving from the **Constitution**.
 
 ## Verification
 
 - [ ] An observable pass condition was stated from the acceptance criteria before running.
-- [ ] The real thing was built/launched (per `[CONST]`) and the actual path exercised.
+- [ ] The real thing was built/launched (per the **Constitution**) and the actual path exercised.
 - [ ] Observation compared to the pass condition, including the implied negative/edge cases.
 - [ ] Evidence captured so the gate rests on fact.
 - [ ] Failures reported faithfully and handed back — no relaxed conditions, no skipped-but-claimed steps.
-- [ ] The gate decision was posed and explicit approval received before handing to `review`.
+- [ ] The gate decision was posed (caller/driver holds it).

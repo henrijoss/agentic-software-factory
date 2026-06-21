@@ -10,9 +10,9 @@ it's done. It is deliberately narrow:
 
 | Concern | Belongs in | Why |
 |---|---|---|
-| Stack, commands, conventions, boundaries | **Constitution** `[CONST]` | Standing, cross-feature — the spec inherits them, never repeats them (two copies drift). |
-| Objective, scope, success criteria | **Spec** `[SPEC]` | This slice's what + why. |
-| Architecture, approach, risks | **Design** `[REQ-n.DESIGN]` | The *how*; decided per requirement after fan-out. |
+| Stack, commands, conventions, boundaries | **Constitution** | Standing, cross-feature — the spec inherits them, never repeats them (two copies drift). |
+| Objective, scope, success criteria | **Spec** | This slice's what + why. |
+| Architecture, approach, risks | **Design** | The *how*; decided per requirement after fan-out. |
 | Use-cases, stakeholders | **`to-requirements`** | Fan-out happens at the transition, not in the spec. |
 | Task sizing, ordering | **`to-tasks`** | Decomposition is a separate transition. |
 
@@ -23,8 +23,8 @@ slice, it's the constitution; if it's *what this slice must achieve*, it's the s
 
 The unit of iteration is one thin end-to-end slice (loop principle 2), not a layer and not the whole
 product. A good slice delivers a complete, demonstrable piece of value — narrow but full-depth. This
-is what lets the loop run specify→…→review and then come back for the next slice, updating the same
-spec in place rather than spec'ing everything up front (which would go stale before code caught up).
+is what lets the loop run specify→…→review and then come back for the next slice, revising the same
+spec rather than spec'ing everything up front (which would go stale before code caught up).
 
 ## Reframe instructions as success criteria
 
@@ -118,10 +118,9 @@ mention of the project's stack or "always run tests" — that's the constitution
 
 ## Re-entry (anti-staleness)
 
-Scope shifts as the slice is built (loop principle 3). When it does, re-run `specify` — it
-**overwrites `spec.md` in place**. Never create `spec-v2.md` or a parallel section. Gate-validation
-at the next gate confirms no reference went stale. Update the spec *first*, then let the change flow
-downstream — never let code silently diverge from it.
+Scope shifts as the slice is built (loop principle 3). When it does, re-run `specify` and emit the
+revised spec — the driver **overwrites the existing spec in place** on ingest, never a parallel copy,
+so spec and code can't silently diverge. Update the spec *first*, then let the change flow downstream.
 
 ## Anti-patterns
 

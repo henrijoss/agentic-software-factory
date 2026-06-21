@@ -14,9 +14,13 @@ runs the **next single phase**, and stops at that phase's human gate. The operat
 step by step. For unattended walking of the whole loop (auto-advancing through gates on approval),
 defer to `orchestrator`, which builds on this skill.
 
-A standalone phase skill (run without a driver) also relies on this skill for storage and structure —
-that is why it is the base. Depth (full storage-binding table, the optional GitHub edge integrations,
-the entry modes and worked example) lives in `references/` and is loaded on demand.
+Every other skill is a **pure, system-agnostic transform** — it knows nothing of the tree, `index.md`,
+IDs, storage, or chaining; it takes the inputs the driver provides and **emits a result** (the result
+contract). This skill does everything system-shaped around it: it **assembles** a phase's inputs from
+the tree before, and **ingests** the emitted result into the tree after — `continue` is the only actor
+that reads/writes the tree, `index.md`, and IDs. Depth (the result contract, ingest and input-assembly
+in `references/handoff.md`; the full storage-binding table and optional GitHub edge integrations; the
+entry modes and worked example) lives in `references/` and is loaded on demand.
 
 ## When to Use
 
@@ -59,7 +63,8 @@ docs/<root>/          ← root chosen at `setup`; default `docs/sdlc/`
 `index.md` is the **root object** and plays three roles at once: **tree map** (navigable structure),
 **ID registry** (stable, rename-safe ID → path), and **status dashboard** (each artifact's current
 phase/gate state — this is "where we left off"). Cross-references target IDs through `index.md`, never
-raw paths buried in prose.
+raw paths buried in prose. The status dashboard also records the **last synced commit** — the git
+`HEAD` the system last reconciled against — which the sync check below reads to detect external drift.
 
 **Optional levels.** Directories materialize only when their producing skill runs. A one-off
 `implement` may create just `index.md` + `spec.md` + one task — no `requirements/` layer. The
@@ -94,11 +99,12 @@ instead of assuming a path.
   artifact paths are relative to it.
   - **Exactly one** → use it.
   - **None** → the tree isn't initialized: run `setup` to choose the location and scaffold it. As a
-    **fallback** for a standalone phase run (no `setup`), create the **default** `docs/sdlc/` root
-    below — **idempotent**, never overwrite or fork.
+    **fallback** when a driver runs without prior `setup`, the driver creates the **default**
+    `docs/sdlc/` root below — **idempotent**, never overwrite or fork.
   - **Multiple** → violates the single-tree invariant; surface it rather than guessing.
 - **`setup` is the front door.** The explicit init that picks the root name (default `sdlc`) and
-  scaffolds it; the driver/phase fallback above only guarantees a default root if `setup` was skipped.
+  scaffolds it; the driver fallback above only guarantees a default root if `setup` was skipped. Only
+  `setup` and the two drivers ever create the tree — standalone non-system skills create none.
 
 Minimal root (created by `setup`, or by the fallback at `docs/sdlc/`):
 
@@ -114,11 +120,13 @@ Minimal root (created by `setup`, or by the fallback at `docs/sdlc/`):
 
 ## Status
 Project: bootstrapped — no phases run yet.
+Last synced commit: <sha | none>
 ```
 
 The status line reflects `setup`'s orient glance: greenfield stays as above; brownfield reads
 `bootstrapped (brownfield: <stack>) — no phases run yet`. It is a one-line signal only — never a code
-inventory.
+inventory. `Last synced commit` is the git `HEAD` the system last reconciled against (`none` when there
+is no repo/commit yet); the sync check maintains it.
 
 ## Phase graph
 
@@ -152,21 +160,43 @@ run `setup` — or, as a fallback, create the default `docs/sdlc/` root idempote
 Read `index.md`'s status dashboard and tree map. The current per-artifact phase/gate state is "where
 we left off."
 
-### 3. Determine the next phase
+### 3. Sync check (drift detection)
+
+Detect code changes made **outside** the system since it last ran — the one blind spot in-place
+re-entry can't see. Read `Last synced commit` from the status dashboard and the current `HEAD`
+(`git rev-parse HEAD`).
+
+- **No git repo / no commits / base missing** → skip (treat as no-drift); record `none` and proceed.
+- **`HEAD` == recorded** → no external drift; proceed to step 4.
+- **`HEAD` != recorded** → examine `recorded..HEAD` (`git diff --stat`, `git log --oneline`), reason
+  about which open `[REQ-*]`/`[TASK-*]` those changes may have **resolved or invalidated**, and **hold
+  the sync gate**: surface that reconciliation decision to the operator (never "looks good?"). Route the
+  decision through normal in-place re-entry (resolved → mark done / confirm via `implement`→`review`;
+  invalidated → re-enter `design`/`specify`). Then set `Last synced commit = HEAD`.
+
+The equality test is only a cheap trigger — the value is reading the diff. Depth (own-commit gap,
+graceful degradation, gate wording, routing, example) lives in `references/sync.md`.
+
+### 4. Determine the next phase
 
 From the status dashboard + the phase graph, pick the **single** next phase. If a single one-off skill
 was requested, defer to that phase skill directly. When the next phase isn't unambiguous, confirm with
 the user rather than guessing (see entry modes in `references/phase-graph.md`).
 
-### 4. Run exactly one phase
+### 5. Assemble inputs, then run exactly one phase
 
-Load and run that one phase skill. It reads its inputs and `[CONST]`, does its work (invoking postures
-as needed), writes its artifact in place, and produces its gate. Do not pre-empt the phase's logic.
+**Assemble** the phase's inputs from the tree (`[CONST]`, the prior artifact on re-entry, the chosen
+`[REQ-n]`, …) per the consumed-by mapping in `references/handoff.md`, and pass them as provided content.
+Then load and run that one phase skill. It is a pure transform: it does its work (invoking postures as
+needed), and **emits its result** — an in-context result block (phase skills) or `.sdlc/scratch/` files
+(`to-*` skills). It does **not** touch the tree, `index.md`, or IDs. Do not pre-empt the phase's logic.
 
-### 5. Hold the gate, then stop
+### 6. Ingest the result, hold the gate, then stop
 
-Run **gate-validation** (dangling / duplicate / orphan / unreachable → fail and surface). Present the
-phase's specific gate decision (never "looks good?"). Update the artifact's status in `index.md`.
+**Ingest** per `references/handoff.md`: capture the emitted result → resolve/assign the stable ID →
+write to the tree path (artifact-io), updating **in place** on re-entry (never fork) → register/update
+`index.md` → clear `.sdlc/scratch/`. Run **gate-validation** (dangling / duplicate / orphan /
+unreachable → fail and surface). Present the phase's specific gate decision (never "looks good?").
 **Stop** — the operator decides whether to run `continue` again for the next step. (Auto-advancing
 across gates is `orchestrator`'s job, not this skill's.)
 
@@ -179,17 +209,28 @@ tree levels a job needs ever materialize.
 ## Red Flags
 
 - Auto-advancing past a gate — that's `orchestrator`; `continue` runs one phase and stops.
+- Letting a phase skill write into the tree/`index.md`/IDs instead of emitting a result the driver
+  ingests, or skipping input-assembly so the phase has to discover the tree itself.
 - Running a phase with no `index.md` entry point, or assuming `docs/sdlc/` instead of resolving the
   root by discovery.
 - Forking a duplicate artifact on re-entry instead of updating in place.
 - A "looks good?" gate with nothing to decide.
 - Skipping gate-validation, letting a stale/broken tree propagate.
+- Skipping the sync check, or treating the equality test as a correctness gate instead of examining the
+  `recorded..HEAD` diff to reconcile.
+- Blocking a phase when there is no git repo/`HEAD` — the sync check degrades to no-drift, never blocks.
 
 ## Verification
 
 - [ ] Tree root resolved by discovering the single `index.md` (or `setup`/fallback ran) before any
       phase — no hardcoded `docs/sdlc/` assumption.
 - [ ] Status dashboard read; the single next phase chosen from the phase graph (or one-off deferred).
+- [ ] Sync check run; any drift (`HEAD` != recorded) surfaced at the sync gate and reconciled, then
+      `Last synced commit` updated to `HEAD` (or `none` when git is absent).
+- [ ] Phase inputs **assembled** from the tree and passed as content; the phase emitted a result
+      (in-context block, or `.sdlc/scratch/` for `to-*`) without touching the tree itself.
 - [ ] Exactly **one** phase run, then stopped at its gate — no auto-advance.
+- [ ] Result **ingested**: ID resolved, written to the tree, `index.md` registered/updated,
+      `.sdlc/scratch/` cleared.
 - [ ] Gate-validation run; the phase's real decision posed; `index.md` status updated.
 - [ ] Re-entry updated artifacts in place — no duplicate fork.

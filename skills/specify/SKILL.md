@@ -17,7 +17,7 @@ the standing rules that hold across every slice (stack, conventions, boundaries)
 repeats the constitution is mis-scoped.
 
 The unit is a **vertical slice / use-case**, not the whole product (loop principle 2). The first
-slice's spec is written from scratch; later slices re-enter and update it in place.
+slice's spec is written from scratch; later slices re-enter and revise it.
 
 ## When to Use
 
@@ -34,16 +34,16 @@ slice's spec is written from scratch; later slices re-enter and update it in pla
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** an idea/intent (raw or from `maintain`), the **Constitution** `[CONST]` (always read
-  first), and any prior **Specification** when re-entering.
-- **Output:** the **Specification** artifact `[ID: SPEC]`. Storage resolves through
-  the `continue` base skill (default: `docs/sdlc/spec.md`, registered in `index.md`).
+- **Input:** an idea/intent (raw or a fed-back maintenance item), the **Constitution** (provided by the
+  caller, always read first), and any prior **Specification** when re-entering.
+- **Output:** the **Specification**, emitted per the result contract for the caller to ingest. The skill
+  writes no files and resolves no storage.
 
 ## Process
 
 ### 1. Read the standing context first
 
-Read the **Constitution** `[CONST]` and, if re-entering, the prior `[SPEC]`. The constitution's
+Read the **Constitution** and, if re-entering, the prior **Specification**. The constitution's
 principles and constraints bound what the spec may commit to — don't restate them, inherit them.
 
 ### 2. Extract the real intent — don't guess
@@ -82,18 +82,17 @@ SUCCESS CRITERIA:
 Success criteria are what `verify`/`review` later check against, so they must be specific. Stay
 above implementation — *what* must be true when done, not *how* it's achieved.
 
-### 5. Write the artifact in place
+### 5. Emit the result
 
-Write the Specification via artifact-io (default `<root>/spec.md`, root default `docs/sdlc/`). Resolve
-the tree root per the `continue` base skill (discover the single `index.md`; if none, `setup` or the
-fallback creates it) and register `SPEC`. Re-entry **overwrites the file in place** — never fork a
-second spec.
+Emit the Specification per the result contract — the body plus its gate decision — for the caller to
+ingest. Write no files and resolve no storage; persistence and any re-entry overwrite are the driver's
+job.
 
-### 6. Gate → to-requirements
+### 6. Gate
 
-Present the spec and force the decision: *"Is the objective, scope, and success right — and is it
-ready to fan out into requirements?"* This gate earns its interruption: everything downstream
-decomposes from this. On explicit approval, hand off to `to-requirements`.
+Force the decision: *"Is the objective, scope, and success right — and is it ready to fan out into
+requirements?"* This gate earns its interruption: everything downstream decomposes from this. Surface
+it for the caller — standalone, present it to the user; under a driver, the driver holds the gate.
 
 ## Artifact shape
 
@@ -131,7 +130,7 @@ the template — empty sections cost the reader's budget downstream.
 - Vague success ("make it better") that `verify` could never check.
 - Silently filling an ambiguous requirement instead of running `interview`.
 - No out-of-scope line.
-- Forking a second spec on re-entry instead of updating in place.
+- Writing files / resolving storage instead of just emitting the result (that's the driver's job).
 
 ## Verification
 
@@ -140,6 +139,5 @@ the template — empty sections cost the reader's budget downstream.
 - [ ] Scope framed as one vertical slice, with an explicit out-of-scope line.
 - [ ] Success criteria are specific and testable (something `verify`/`review` can check).
 - [ ] No implementation/architecture detail (that's `design`).
-- [ ] Written via artifact-io as `SPEC`, registered in `index.md`, entry point exists.
-- [ ] Re-entry updated the file in place — no duplicate artifact.
-- [ ] The gate decision was posed and explicit approval received before handing to `to-requirements`.
+- [ ] Emitted per the result contract; no files written / no storage resolved by the skill.
+- [ ] The gate decision was posed (caller/driver holds it).

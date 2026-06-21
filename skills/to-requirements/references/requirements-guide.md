@@ -7,10 +7,10 @@ sequencing, the template, a worked example, and the handoff shape `clarify`/`des
 
 | Concern | Belongs in | Why |
 |---|---|---|
-| Objective, scope, success for the whole effort | **`specify`** `[SPEC]` | the singular what/why — decided before fan-out |
+| Objective, scope, success for the whole effort | **`specify`** | the singular what/why — decided before fan-out |
 | Stakeholders + N use-case Requirements; sequencing | **`to-requirements`** | the fan-out — this skill |
-| Deepening one Requirement to ready (deep-dive) | **`clarify`** `[REQ-n]` | per-requirement detail before design |
-| The approach for one Requirement | **`design`** `[REQ-n.DESIGN]` | the how |
+| Deepening one Requirement to ready (deep-dive) | **`clarify`** | per-requirement detail before design |
+| The approach for one Requirement | **`design`** | the how |
 
 Keep requirements **draft-level** here. Over-specifying one now wastes effort if it isn't the first
 slice and duplicates what `clarify` will do properly.
@@ -50,15 +50,15 @@ State which you used so the user can override with their own priority.
 ## Requirement template (full)
 
 ```markdown
-# REQ-n — [use-case title]
+# [use-case title]
 
-**As a** [STK-n] **I want** [capability] **so that** [value].
+**As a** [stakeholder] **I want** [capability] **so that** [value].
 
 **Acceptance (draft):**
 - [signal this use-case is satisfied — clarify will sharpen into testable criteria]
 
-**Stakeholders:** [STK-n, …]
-**Depends on:** [other REQ ids, or none]
+**Stakeholders:** [stakeholder, …]
+**Depends on:** [other requirements, or none]
 **Open questions:**
 - [what clarify must resolve before this can be designed]
 ```
@@ -72,21 +72,21 @@ ready Requirement. Keep the shape stable so the handoff is clean.
 
 ```markdown
 Stakeholders:
-- STK-1 Researcher (me) — needs to not lose track of running experiments.
-- STK-2 Teammate — occasionally needs to see what's running.
+- Researcher (me) — needs to not lose track of running experiments.
+- Teammate — occasionally needs to see what's running.
 
 Requirements (draft, sequenced):
-# REQ-01 — Register an experiment
-As a STK-1 I want to add an experiment with its hypothesis so that there's one list, not five docs.
+# Register an experiment
+As a Researcher I want to add an experiment with its hypothesis so that there's one list, not five docs.
 Acceptance (draft): can add an experiment; it appears in a single list.
-Stakeholders: STK-1   Open questions: which fields are required?
+Stakeholders: Researcher   Open questions: which fields are required?
 
-# REQ-02 — See running experiments at a glance
-As a STK-1 I want a status view so that I know what's live without hunting.
-Acceptance (draft): a view shows each experiment's status. Depends on: REQ-01
-Stakeholders: STK-1, STK-2   Open questions: what statuses exist?
+# See running experiments at a glance
+As a Researcher I want a status view so that I know what's live without hunting.
+Acceptance (draft): a view shows each experiment's status. Depends on: Register an experiment
+Stakeholders: Researcher, Teammate   Open questions: what statuses exist?
 
-First slice: REQ-01 (thinnest end-to-end — nothing else works without the list existing).
+First slice: Register an experiment (thinnest end-to-end — nothing else works without the list existing).
 ```
 
 Note: no UI/tech detail (that's `design`) and no fully-nailed acceptance (that's `clarify`) — just
@@ -94,11 +94,11 @@ the right vertical use-cases, their stakeholders, and a justified first slice.
 
 ## Anti-patterns
 
-- **Enabler requirements.** "Set up the database" as a standalone REQ — it serves no use-case
+- **Enabler requirements.** "Set up the database" as a standalone requirement — it serves no use-case
   directly. Fold infrastructure into the first slice that needs it.
 - **Horizontal decomposition.** Splitting by layer instead of by user-visible value.
 - **Premature depth.** Writing full acceptance criteria for every requirement here; `clarify` does
   that for the slice actually being built next.
 - **Orphan stakeholders / orphan requirements.** A stakeholder no requirement serves, or a
-  requirement no stakeholder needs — gate-validation and the budget test both say cut it.
+  requirement no stakeholder needs — cut it.
 - **No first-slice recommendation.** Handing back an unordered pile; the loop needs a starting point.

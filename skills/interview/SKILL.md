@@ -48,9 +48,8 @@ instead of guessing.
 
 - **Input:** an underspecified ask plus whatever context the calling phase already holds.
 - **Output:** a **confirmed statement of intent** (the Step-4 restate + an explicit Step-5 yes),
-  returned to the caller. `interview` writes **no artifact of its own** — the calling phase folds
-  the intent into its artifact via the `continue` base skill. Persist standalone only on request
-  (see Output).
+  returned to the caller. `interview` writes **no artifact of its own** — the calling skill folds the
+  intent into its own result. Persist standalone only on request (see Output).
 
 ## Process
 
@@ -123,11 +122,11 @@ reactions — something foundational is missing. Want to step back?"
 
 ## Output & handoff
 
-The deliverable is the confirmed intent (Step 4 + explicit yes). The calling phase consumes it:
-`specify` writes it into the **Specification**, `clarify` into the **Requirement**, `constitution`
-into the **Constitution** — all via artifact-io. If invoked standalone and the user wants the intent
-to persist across sessions, offer to save to `docs/intent/[topic].md`; save only on confirmation
-(the doc itself implies a yes the user hasn't given).
+The deliverable is the confirmed intent (Step 4 + explicit yes). The calling skill consumes it:
+`specify` folds it into the **Specification**, `clarify` into the **Requirement**, `constitution`
+into the **Constitution** — each into its own emitted result. If invoked standalone and the user wants
+the intent to persist across sessions, offer to save it to a file the user names; save only on
+confirmation (the doc itself implies a yes the user hasn't given).
 
 ## Red Flags
 
@@ -148,4 +147,4 @@ to persist across sessions, offer to save to `docs/intent/[topic].md`; save only
 - [ ] A concrete restate (Outcome / User / Why now / Success / Constraint / Out of scope) was written back.
 - [ ] The user gave an explicit yes — not "whatever you think", not "sounds good", not silence.
 - [ ] At the stop point, reactions to the next three questions were predictable.
-- [ ] Intent handed to the caller (or saved to `docs/intent/` only if the user confirmed).
+- [ ] Intent handed to the caller (or saved to a user-named file only if the user confirmed).

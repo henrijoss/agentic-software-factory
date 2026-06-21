@@ -33,8 +33,8 @@ A bloated constitution degrades compliance everywhere downstream — the opposit
 
 - **Input:** project context — existing standing docs (`CLAUDE.md`, `README`, `docs/adr/`, memory)
   plus the user's intent for what is non-negotiable.
-- **Output:** the **Constitution** artifact `[ID: CONST]`. Storage resolves through
-  the `continue` base skill (default backend: `docs/sdlc/constitution.md`, registered in `index.md`).
+- **Output:** the **Constitution**, emitted per the result contract for the caller to ingest. The skill
+  itself writes no project artifact and resolves no storage — it just produces the constitution.
 
 ## Process
 
@@ -43,8 +43,8 @@ A bloated constitution degrades compliance everywhere downstream — the opposit
 Before asking anything, read what already encodes standing rules: `CLAUDE.md`, `README`, `docs/adr/`,
 memory. Much of the constitution may already exist — pull durable principles from there.
 
-On a **brownfield** project (per `index.md` status from `setup`), also capture the **existing-system
-facts** that bound every future slice — stack, primary entry points, conventions — but as **references**
+On a **brownfield** project (the caller signals greenfield vs brownfield), also capture the
+**existing-system facts** that bound every future slice — stack, primary entry points, conventions — but as **references**
 (link `CLAUDE.md`, manifests, key directories) plus at most a few lean constraints that pass the budget
 test (e.g. "new slices extend the existing Django app; do not re-platform"). Never copy a code inventory
 in: that is a snapshot that goes stale the moment code moves. Fine-grained current state is read live by
@@ -70,18 +70,17 @@ Every candidate principle must pass: **"Would a later phase change its behavior 
 line?"** If not, cut it. Aim for ~5–12 principles. The constitution is law, not documentation; if it
 reads like a wiki, it is too big. See `references/authoring-guide.md` for the principle-vs-not tests.
 
-### 5. Write the artifact
+### 5. Emit the result
 
-Write the Constitution via artifact-io (default `<root>/constitution.md`, root default `docs/sdlc/`).
-Resolve the tree root per the `continue` base skill (discover the single `index.md`; if none, `setup`
-or the fallback creates it) and register `CONST`. Re-entry **updates the file in place** — never fork
-a second constitution.
+Emit the Constitution per the result contract — the body plus its gate decision — for the caller to
+ingest. Write no files and resolve no storage; persistence and any re-entry overwrite are the driver's
+job, not this skill's.
 
-### 6. Gate → specify
+### 6. Gate
 
-Present the constitution and force the decision: *"Are these the standing principles we commit every
-feature to?"* This gate earns its interruption because everything downstream inherits these. On
-explicit approval, hand off to `specify`.
+Force the decision: *"Are these the standing principles we commit every feature to?"* This gate earns
+its interruption because everything downstream inherits these. Surface it for the caller — standalone,
+present it to the user; under a driver, the driver holds the gate and advances on approval.
 
 ## Artifact shape
 
@@ -119,7 +118,7 @@ adds constraints, boundaries, and trade-off defaults. Never pad a small project 
 - A constitution longer than ~one screen — it competes with every phase's instruction budget.
 - Principles a downstream phase would never act on (documentation, not law).
 - Per-feature detail leaking in (belongs in the spec).
-- Forking a second constitution on re-entry instead of updating in place.
+- Writing files / resolving storage instead of just emitting the result (that's the driver's job).
 
 ## Verification
 
@@ -128,6 +127,5 @@ adds constraints, boundaries, and trade-off defaults. Never pad a small project 
       copied code inventory.
 - [ ] Each principle passes the budget test (changes some downstream phase's behavior).
 - [ ] The constitution fits ~one screen.
-- [ ] Written via artifact-io as `CONST`, registered in `index.md`, entry point exists.
-- [ ] Re-entry updated the file in place — no duplicate artifact.
-- [ ] The gate decision was posed and explicit approval received before handing to `specify`.
+- [ ] Emitted per the result contract; no files written / no storage resolved by the skill.
+- [ ] The gate decision was posed (caller/driver holds it).
