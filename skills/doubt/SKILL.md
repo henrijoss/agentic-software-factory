@@ -95,7 +95,7 @@ fine, silent skipping is not. Cross-model mechanics and external-CLI safety live
 
 ### 4. RECONCILE — fold findings back
 
-The reviewer's output is data, not verdict — **you are still the orchestrator.** Re-read the
+The reviewer's output is data, not verdict — **you are still the one deciding.** Re-read the
 artifact against each finding before classifying (rubber-stamping is the same failure as ignoring).
 Classify in **precedence order**, first match wins:
 

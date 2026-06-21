@@ -1,8 +1,8 @@
 # Artifact I/O Binding (depth)
 
 Loaded on demand by the `continue` base skill. The single place that maps **abstract artifacts** used
-by the SDLC skillset to concrete **storage operations**. Only the system skills (`setup`, `continue`,
-`orchestrator`) read this binding: the **driver** resolves *how* to store/retrieve an artifact here
+by the SDLC skillset to concrete **storage operations**. Only the system skills (`setup`, `continue`)
+read this binding: the **driver** resolves *how* to store/retrieve an artifact here
 during **input-assembly** (uses the *Consumed by* column to gather a phase's inputs) and **ingest**
 (uses the *Produced by* column + the storage table to persist an emitted result). Phase/transition
 skills never touch storage — they emit a result per the contract (see `references/handoff.md`). The
@@ -98,12 +98,13 @@ any artifact is written. The root is **discovered** (the one SDLC `index.md`, de
 
 1. **`setup` is the explicit init.** It picks the root name (default `sdlc`) and scaffolds the minimal
    `index.md`. Run once at project start.
-2. **A driver resolves/falls back.** At session start the `continue` base skill (or `orchestrator`)
+2. **The driver resolves/falls back.** At session start the `continue` base skill
    discovers the single `index.md`; if none exists (no `setup` run), it creates the **default**
    `docs/sdlc/` minimal root. Idempotent — an existing tree is left untouched, never forked.
 
-Only `setup` and the two drivers ever create or write the tree. A phase/transition skill run standalone
-creates **no** tree — it just emits its result; the operator runs `continue` afterward to ingest it.
+Only `setup` and the `continue` driver ever create or write the tree. A phase/transition skill run
+standalone creates **no** tree — it just emits its result; the operator runs `continue` afterward to
+ingest it.
 So the entry point is guaranteed whether the project starts fresh, mid-loop, or from a single driven
 step, and the root location is configurable — keeping the four invariants satisfiable from the very
 first write. Minimal root:
@@ -130,7 +131,7 @@ version the tree was created/migrated with and holds tweakable execution prefere
 in the `continue` base skill's *Settings* subsection). It is **not** an abstract artifact — it has no
 ID, no entry in the table above, and no phase produces or consumes it. Only the system skills read/write
 it: `setup` writes it at init, the driver bootstrap creates a default one alongside the fallback
-`index.md`, and the drivers read it (version-compat check + settings) at session start. Phase skills
+`index.md`, and the driver reads it (version-compat check + settings) at session start. Phase skills
 receive any settings-derived value as a provided input, never the file.
 
 ## GitHub issues — optional edge integrations (not a backend)

@@ -1,16 +1,16 @@
 # Continue — Presentation Contract (depth)
 
-Loaded on demand by the `continue` base skill (and referenced by `orchestrator`). How the **drivers**
-frame their **interactive** conversational output so that, at every step, the operator can see which
+Loaded on demand by the `continue` base skill. How the **driver**
+frames its **interactive** conversational output so that, at every step, the operator can see which
 phase we're in, what it operates on, where it sits in the loop, and exactly what they must do next.
 
 ## Scope (read first)
 
-- **Drivers own this framing.** Only `continue` and `orchestrator` emit it — they are the only actors
-  that know loop position, the artifact identity (which `[REQ-n]`/`[TASK-m]`), the resolved gate
+- **The driver owns this framing.** Only `continue` emits it — it is the only actor
+  that knows loop position, the artifact identity (which `[REQ-n]`/`[TASK-m]`), the resolved gate
   decision, and whether the session is interactive. **Phase/transition skills never emit it** — they
   are pure transforms that return a result the driver frames.
-- **Interactive mode only.** In **non-interactive / headless mode** (`claude -p`, `skills/orchestrator/loop.sh`)
+- **Interactive mode only.** In **non-interactive / headless mode** (`claude -p`, `skills/continue/loop.sh`)
   there is no human to read a banner or act on a call-to-action: the driver writes `.sdlc/loop-control`
   (`continue` / `halt: <reason>` / `done`) as defined in `fresh-context.md` and emits **none** of the
   banners, maps, saved confirmations, gate blocks, pickers, or footers below — and never invokes an
@@ -96,7 +96,8 @@ Safe to clear or close — index.md holds the state; resume with /continue.
   disposability terms (`index.md` + the tree are the only memory carried forward). **No git mention** —
   ingest writes files to disk; committing is the operator's separate step.
 
-Compact form (when the orchestrator **auto-advances** — avoids restacking the full block each phase):
+Compact form (when the operator runs `continue` again **in the same interactive session** rather than a
+fresh one — avoids restacking the full block each step):
 ```
 ✓ saved · REQ-02.DESIGN, index.md
 ```
@@ -198,13 +199,15 @@ First slice proposed: REQ-02 · saved-search alerts.
 - **Phase-start banner + vertical map:** once per phase, at its start. **Not** mid-phase, **not** per
   tool call. This is the single most important rule for keeping the display from becoming wallpaper.
 - **Saved confirmation:** once per **successful ingest** (the "phase finished + tree saved" marker) —
-  full form when the step stops (manual `continue` / a pause gate), compact one-line form when the
-  orchestrator auto-advances. Emitted only after gate-validation **passes**; on failure surface the
-  validation error, not a "saved" claim.
-- **Gate decision + hand-off (picker or footer):** once per resolved-**pause** gate (end of phase).
-  Under `auto` / `milestones`, a gate that **auto-advances** emits **neither** — only the saved
-  confirmation and the next phase's start banner. So the hand-off appears **only where the operator
-  actually owes a decision**.
+  full form when the session ends here (the normal case), compact one-line form when the operator runs
+  `continue` again in the same interactive session. Emitted only after gate-validation **passes**; on
+  failure surface the validation error, not a "saved" claim.
+- **Gate decision + hand-off (picker or footer):** once, at the gate the step stops on. Interactive
+  `continue` runs a single step and always presents that step's gate, so the hand-off appears wherever
+  the operator owes a decision. The exception is a finished `implement` task with **more tasks
+  remaining** — that is not a gate: emit the saved confirmation and a plain "next: `[REQ-n.TASK-m]`"
+  pointer (no picker), since the only thing to do is run the next task. (`gatePolicy` auto-advance is a
+  headless concept — it never applies in interactive mode, which has no in-session multi-step walk.)
 - **Mid-phase work** (the phase doing its work, tool calls, reasoning) carries **no** banners, maps, or
   hand-offs — they are phase-boundary furniture only.
 

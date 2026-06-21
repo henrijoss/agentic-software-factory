@@ -1,6 +1,6 @@
 ---
 name: continue
-description: The base skill of the SDLC skillset — load it whenever you work within this system. It defines the artifact tree, stable IDs, storage, the tree's structural invariants, gate-validation, and tree-root bootstrap, plus the canonical phase graph. As the default driver it reads where the project left off from `index.md`, runs the next single phase, and stops at its gate. Use to resume/continue a project ("where did we leave off", "do the next step") or whenever a phase skill needs the structure and storage rules. For unattended full-loop automation, use `orchestrator` instead.
+description: The base skill of the SDLC skillset — load it whenever you work within this system. It defines the artifact tree, stable IDs, storage, the tree's structural invariants, gate-validation, and tree-root bootstrap, plus the canonical phase graph. As the sole driver it reads where the project left off from `index.md`, runs the next single step — one phase, or one `implement` task — and stops at its gate. Use to resume/continue a project ("where did we leave off", "do the next step") or whenever a phase skill needs the structure and storage rules. For unattended full-loop automation, the fresh-process loop (`loop.sh`) repeatedly invokes it — one fresh session per step.
 ---
 
 # Continue (base skill)
@@ -9,10 +9,11 @@ description: The base skill of the SDLC skillset — load it whenever you work w
 
 `continue` is the **foundation of the SDLC skillset**. Any work within this system loads it first: it
 is the single place that defines *how artifacts are stored and structured* and *how the loop is
-sequenced*. It is also the **default driver** — it reads `index.md` to see where the project stands,
-runs the **next single phase**, and stops at that phase's human gate. The operator stays in control
-step by step. For unattended walking of the whole loop (auto-advancing through gates on approval),
-defer to `orchestrator`, which builds on this skill.
+sequenced*. It is also the **sole driver** — it reads `index.md` to see where the project stands,
+runs the **next single step** (one phase, or one `implement` task), and stops at that step's human gate.
+The operator stays in control step by step. There is no in-session multi-step driver: to walk the whole
+loop unattended, the fresh-process loop (`loop.sh`, see `references/fresh-context.md`) relaunches this
+skill in a brand-new session for each step, so context is zeroed between steps instead of growing.
 
 Every other skill is a **pure, system-agnostic transform** — it knows nothing of the tree, `index.md`,
 IDs, storage, or chaining; it takes the inputs the driver provides and **emits a result** (the result
@@ -26,8 +27,10 @@ in `references/` and is loaded on demand.
 Each step is **self-contained**: it resumes from `index.md` and ends by writing its result back to the
 tree. The conversation is disposable — once a step is ingested, `index.md` holds everything the next
 step needs, so the next step can (and for long unattended runs, should) start from a **completely
-fresh context**. `references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and the
-non-interactive loop-control contract below.
+fresh context**. A step is one phase, except in `implement`, where each step is a **single task** — so a
+slice's `implement` phase spans as many steps as it has tasks, each a fresh session.
+`references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and the non-interactive
+loop-control contract below.
 
 ## Skillset version
 
@@ -37,22 +40,25 @@ SDLC_SKILLSET_VERSION = 0.1.0
 
 This is the **single source of truth** for the running skillset's version — the version of the
 artifact-tree *contract* this skillset defines. It lives here because `continue` is the definer of that
-contract, and both other system skills load/defer to it (`setup` for structure, `orchestrator` as its
-base). Bumping the skillset = editing this one line (semver: `major.minor.patch`). A project records the
-version it was created/migrated with in its `settings.json` (below); the drivers compare the two at
+contract, and the other system skill (`setup`) loads/defers to it for structure. Bumping the skillset =
+editing this one line (semver: `major.minor.patch`). A project records the
+version it was created/migrated with in its `settings.json` (below); the driver compares the two at
 session start (see the **version-compat check** in Process).
 
 ## When to Use
 
 - **Resume:** continue a project from where `index.md`'s status dashboard left off — run the next step.
-- **Single step:** advance the project by exactly one phase, then stop at its gate.
+- **Single step:** advance the project by exactly one step (one phase, or one `implement` task), then
+  stop at its gate.
 - **Structure/storage reference:** any time a phase needs the artifact tree, IDs, paths, bootstrap, or
   gate-validation rules.
 
 **When NOT to use:**
 
-- Unattended full-loop automation across many phases — that's `orchestrator`.
 - As a phase itself — it owns no phase artifact; it sequences phases and defines the structure.
+
+For unattended full-loop automation across many steps, you still use `continue` — the fresh-process loop
+(`loop.sh`) just relaunches it per step. There is no separate full-loop driver.
 
 ## Artifact tree & storage (local files, versioned with code)
 
@@ -86,6 +92,14 @@ phase/gate state — this is "where we left off"). Cross-references target IDs t
 raw paths buried in prose. The status dashboard also records the **last synced commit** — the git
 `HEAD` the system last reconciled against — which the sync check below reads to detect external drift.
 
+**Per-task status (drives the `implement` step loop).** Each `[REQ-n.TASK-m]` registry row carries a
+lifecycle status — `pending` (not started), `in-progress` (claimed by a step that didn't finish — e.g. a
+crash or `halt` mid-task; the next step resumes it from the SessionSummary rather than skipping it),
+`done` (implemented and passed its `verify`/`test` acceptance check), or `blocked` (cannot proceed
+without a human). This per-task status is **authoritative** for picking the next `implement` task on a
+cold read; the SessionSummary's **Next** is a confirming pointer, not the source of truth. `to-tasks`
+registers new tasks as `pending`.
+
 **Optional levels.** Directories materialize only when their producing skill runs. A one-off
 `implement` may create just `index.md` + `spec.md` + one task — no `requirements/` layer. The
 single-entry-point invariant holds at every size.
@@ -102,7 +116,7 @@ integrations** (`maintain` inbound, optional one-way mirror — not a backend) l
 A single `settings.json` sits **next to `index.md`** at `docs/<root>/settings.json`, versioned with the
 tree. It pins the skillset version the tree was created/migrated with and holds tweakable execution
 preferences. It is a **system file**, not an abstract artifact: **only the system skills (`setup`,
-`continue`, `orchestrator`) read or write it.** Phase skills never see it — anything that must influence
+`continue`) read or write it.** Phase skills never see it — anything that must influence
 a phase is passed to it as a plain input by the driver (see `references/handoff.md`).
 
 ```json
@@ -120,7 +134,7 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
 ```
 
 - `version` — the `SDLC_SKILLSET_VERSION` that created or last migrated this tree. Written at init,
-  checked by the drivers at session start, auto-bumped forward on a safe (same-major, newer) run.
+  checked by the driver at session start, auto-bumped forward on a safe (same-major, newer) run.
 - `treeRoot` — the resolved root path (`docs/<root>`). Confirms — does not replace — discovery, and lets
   `loop.sh`/drivers skip the search.
 - `execution.maxSteps` — default step cap for the fresh-process loop (`loop.sh` reads it; the `MAX_STEPS`
@@ -137,7 +151,7 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
   `{}`. (`verify`/`test` share the key `verify`.)
 
 **Gate autonomy (how `gatePolicy`/`gateOverrides` are applied).** This is a **system-skill concern** —
-only the drivers consult it; phase skills never see it (like every other setting). At each gate the
+only the driver consults it; phase skills never see it (like every other setting). At each gate the
 driver resolves *pause vs. advance* by this precedence:
 
 1. **Safety floor first — always pause/halt, ignoring policy and overrides:** `deploy` or any
@@ -149,10 +163,11 @@ driver resolves *pause vs. advance* by this precedence:
    **milestone gate** (`constitution`, `specify`, `design`, `review` — the direction-defining,
    costly-to-reverse decisions), else advance.
 
-A resolved **pause** means the driver presents the gate decision and waits (interactive) or writes
-`halt` (headless); a resolved **advance** means it auto-advances (interactive) or writes `continue`
-(headless). The gate and its **gate-validation still run on every transition** regardless of policy —
-only the human prompt at a *routine* gate is what `gatePolicy` relaxes.
+This resolution only applies **headless** (under the `loop.sh` loop): a resolved **pause** writes
+`halt`, a resolved **advance** writes `continue`. **Interactive `continue` is single-step** — it always
+presents the gate and stops, regardless of `gatePolicy` (the operator is the loop). Either way the gate
+and its **gate-validation still run on every transition**; `gatePolicy` only relaxes the human prompt at
+a *routine* gate in the headless loop.
 
 **Forward-compatible:** unknown keys are ignored and any missing key falls back to the default above, so
 new settings can be added without breaking older trees. `setup` writes the full file with defaults and
@@ -185,7 +200,7 @@ instead of assuming a path.
   - **Multiple** → violates the single-tree invariant; surface it rather than guessing.
 - **`setup` is the front door.** The explicit init that picks the root name (default `sdlc`) and
   scaffolds it; the driver fallback above only guarantees a default root if `setup` was skipped. Only
-  `setup` and the two drivers ever create the tree — standalone non-system skills create none.
+  `setup` and the `continue` driver ever create the tree — standalone non-system skills create none.
 
 Minimal root (created by `setup`, or by the fallback at `docs/sdlc/`):
 
@@ -211,7 +226,7 @@ is no repo/commit yet); the sync check maintains it.
 
 ## Phase graph
 
-The canonical sequencing source — the loop both drivers walk. Linear spine, closed by
+The canonical sequencing source — the loop the driver walks. Linear spine, closed by
 `maintain → specify`:
 
 ```
@@ -275,13 +290,21 @@ re-entry can't see. Read `Last synced commit` from the status dashboard and the 
 The equality test is only a cheap trigger — the value is reading the diff. Depth (own-commit gap,
 graceful degradation, gate wording, routing, example) lives in `references/sync.md`.
 
-### 4. Determine the next phase
+### 4. Determine the next step
 
-From the status dashboard + the phase graph, pick the **single** next phase. If a single one-off skill
-was requested, defer to that phase skill directly. When the next phase isn't unambiguous, confirm with
+From the status dashboard + the phase graph, pick the **single** next step. If a single one-off skill
+was requested, defer to that phase skill directly. When the next step isn't unambiguous, confirm with
 the user rather than guessing (see entry modes in `references/phase-graph.md`). At the **`verify`/`test`
 node**, use `settings.execution.verifyMode` to pick `test` / `verify` / both without asking — unless it
 is `ask` (prompt as usual).
+
+**Inside `implement`, a step is one task.** When the chosen slice `[REQ-n]` is in the `implement` phase,
+the next step is **one task**, not the whole phase: pick the lowest-ordered `[REQ-n.TASK-m]` that is not
+`done` and whose dependency-graph prerequisites (from `to-tasks`) are all `done`, and run `implement` on
+**that one task**. When **all** of the slice's tasks are `done`, the next step is the **`verify`/`test`
+node** (the implement→verify gate). When the next runnable task is `blocked` or every remaining task has
+an unmet dependency, that is a safety-floor **halt** for a human. This per-task granularity is what gives
+each task a fresh session under the `loop.sh` loop.
 
 ### 5. Assemble inputs, then run exactly one phase
 
@@ -297,10 +320,18 @@ needed), and **emits its result** — an in-context result block (phase skills) 
 
 **Ingest** per `references/handoff.md`: capture the emitted result → resolve/assign the stable ID →
 write to the tree path (artifact-io), updating **in place** on re-entry (never fork) → register/update
-`index.md` → clear `.sdlc/scratch/`. Run **gate-validation** (dangling / duplicate / orphan /
-unreachable → fail and surface). Present the phase's specific gate decision (never "looks good?").
-**Stop** — the operator decides whether to run `continue` again for the next step. (Auto-advancing
-across gates is `orchestrator`'s job, not this skill's.)
+`index.md` → clear `.sdlc/scratch/`. For an `implement` step, ingest also updates the just-finished
+**task's status** in `index.md` (`done`, or `blocked`) alongside the SessionSummary it wrote. Run
+**gate-validation** (dangling / duplicate / orphan / unreachable → fail and surface). Present the
+step's specific gate decision (never "looks good?"). **Stop** — the session ends here. The operator
+runs `continue` again for the next step, or the `loop.sh` loop relaunches it in a fresh session.
+Advancing across steps is the external loop's job, never an in-session walk.
+
+**A finished `implement` task that is not the last one is not a gate.** When tasks remain in the slice,
+there is no phase transition yet — the next step is simply the next task. Do **not** consult `gatePolicy`
+(it governs phase-transition gates); just stop, leaving the next task `pending`/`in-progress` for the
+following fresh session. Only the **last** task completing reaches the implement→verify gate, which then
+resolves via the gate-autonomy precedence like any other transition.
 
 **Interactive framing (presentation contract).** When a human is present, frame the output per
 `references/presentation.md`: at phase entry emit a **phase-start banner** (`━━━ PHASE N/11 · <phase> ━━━`
@@ -320,28 +351,32 @@ footer with the same options. Banners/maps appear once per phase, never mid-phas
 literal templates, the picker option sets, and the narrow-terminal degradation ladder.
 
 **Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
-the gate — e.g. driven by `skills/orchestrator/loop.sh`), do not pause. After ingest + gate-validation,
+the gate — e.g. driven by `skills/continue/loop.sh`), do not pause. After ingest + gate-validation,
 write `.sdlc/loop-control` with exactly one of: `continue` (advance), `halt: <reason>` (a human is
 required), or `done` (the slice/loop is complete). Resolve which to write via the **gate-autonomy
-precedence** above: the **safety floor always `halt`s** — an ambiguous next phase, a held **sync gate**
+precedence** above: the **safety floor always `halt`s** — an ambiguous next step, a held **sync gate**
 (external drift), `deploy` or any outward/irreversible authorization, failed gate-validation, a major
 version mismatch, or a decision the phase would otherwise have to guess; otherwise a resolved **pause**
 (from `gateOverrides` or `gatePolicy`) writes `halt: gate <phase> — gatePolicy=<policy>`, and a resolved
-**advance** writes `continue`. This is how the human-gate-on-every-transition rule holds without a human
-in the loop — and how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt`
-cases: `references/fresh-context.md`. Headless emits the loop-control file and **none** of the
-interactive presentation furniture (banners, maps, gate blocks, `NEXT` footers) — those are
-interactive-only (`references/presentation.md`).
+**advance** writes `continue`. A finished `implement` task with **more tasks remaining** is not a gate —
+write `continue` unconditionally (only the safety floor can override); the next fresh session picks the
+next task. This is how the human-gate-on-every-transition rule holds without a human in the loop — and
+how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt` cases:
+`references/fresh-context.md`. Headless emits the loop-control file and **none** of the interactive
+presentation furniture (banners, maps, gate blocks, `NEXT` footers) — those are interactive-only
+(`references/presentation.md`).
 
 ## Composability (big↔small)
 
 A typo just runs `implement`. A single requirement enters at `design`. A whole product walks the loop
-one `continue` step at a time, or hands off to `orchestrator` for unattended runs. Only the phases and
-tree levels a job needs ever materialize.
+one `continue` step at a time — interactively, or unattended via the `loop.sh` fresh-process loop that
+relaunches `continue` per step. Only the phases and tree levels a job needs ever materialize.
 
 ## Red Flags
 
-- Auto-advancing past a gate — that's `orchestrator`; `continue` runs one phase and stops.
+- Auto-advancing past a gate within one session, or looping over multiple steps in a single session to
+  "keep going" — `continue` runs one step (one phase, or one `implement` task) and stops; the `loop.sh`
+  fresh-process loop is what advances across steps, each in a new session.
 - Letting a phase skill write into the tree/`index.md`/IDs instead of emitting a result the driver
   ingests, or skipping input-assembly so the phase has to discover the tree itself.
 - Running a phase with no `index.md` entry point, or assuming `docs/sdlc/` instead of resolving the
@@ -373,7 +408,7 @@ tree levels a job needs ever materialize.
 - Running a phase without the version-compat check, or auto-advancing past a **major** version mismatch
   instead of halting for a migration/override decision.
 - Letting a phase skill read `settings.json` directly instead of receiving settings-derived values as
-  provided inputs — only `setup`/`continue`/`orchestrator` touch the file.
+  provided inputs — only `setup`/`continue` touch the file.
 
 ## Verification
 
@@ -386,14 +421,16 @@ tree levels a job needs ever materialize.
       skill read `settings.json`.
 - [ ] Gate autonomy honored the precedence (safety floor → `gateOverrides` → `gatePolicy`): the safety
       floor still paused/`halt`ed under every policy; only routine gates auto-advanced.
-- [ ] Status dashboard read; the single next phase chosen from the phase graph (or one-off deferred).
+- [ ] Status dashboard read; the single next step chosen from the phase graph — one phase, or, inside
+      `implement`, the next non-`done` task whose dependencies are met (or one-off deferred).
 - [ ] Sync check run; any drift (`HEAD` != recorded) surfaced at the sync gate and reconciled, then
       `Last synced commit` updated to `HEAD` (or `none` when git is absent).
 - [ ] Phase inputs **assembled** from the tree and passed as content; the phase emitted a result
       (in-context block, or `.sdlc/scratch/` for `to-*`) without touching the tree itself.
-- [ ] Exactly **one** phase run, then stopped at its gate — no auto-advance.
+- [ ] Exactly **one** step run — one phase, or one `implement` task — then stopped; the session ended
+      with no in-session advance to the next step.
 - [ ] Result **ingested**: ID resolved, written to the tree, `index.md` registered/updated,
-      `.sdlc/scratch/` cleared.
+      `.sdlc/scratch/` cleared; for an `implement` step, the finished task's status set to `done`/`blocked`.
 - [ ] Gate-validation run; the phase's real decision posed (interactive), or `.sdlc/loop-control`
       written with `continue`/`halt: <reason>`/`done` (non-interactive) — `halt` for any gate owing a
       human decision.

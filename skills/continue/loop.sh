@@ -2,14 +2,16 @@
 #
 # Fresh-context step loop for the SDLC skillset (Ralph-style).
 #
-# Each iteration is a BRAND-NEW `claude` process. It reads index.md cold, runs
-# exactly one phase via the prompt (default `/continue`), writes the result to
-# the artifact tree + index.md, and exits. The process then dies — so context is
-# fully reset between steps. index.md is the only memory carried across steps.
+# This is THE way to run the SDLC unattended. `continue` runs exactly one step
+# and stops; this loop is what turns those single steps into a full run. There is
+# no in-session multi-step driver — the conversation is never kept alive across
+# steps, which is the whole point: context cannot grow.
 #
-# This is the fresh-process variant of `orchestrator`: orchestrator auto-advances
-# the loop inside ONE session (context grows); this trades that for a cold process
-# per step (context never grows).
+# Each iteration is a BRAND-NEW `claude` process. It reads index.md cold, runs
+# exactly one step via the prompt (default `/continue`) — one phase, or one
+# `implement` task — writes the result to the artifact tree + index.md, and exits.
+# The process then dies, so context is fully reset between steps. index.md (plus
+# the SessionSummary, within a slice) is the only memory carried across steps.
 #
 # Driving the loop: a non-interactive `/continue` cannot pause for a human, so it
 # writes its gate decision to `.sdlc/loop-control` (see continue/SKILL.md and
@@ -22,9 +24,9 @@
 #   (missing)    -> the step never reached its gate; stop (needs attention)
 #
 # Usage:
-#   skills/orchestrator/loop.sh                 # drives /continue, up to MAX_STEPS
-#   skills/orchestrator/loop.sh "/orchestrator" # any prompt/skill
-#   MAX_STEPS=100 skills/orchestrator/loop.sh   # env overrides the settings.json default
+#   skills/continue/loop.sh                 # drives /continue, up to MAX_STEPS
+#   skills/continue/loop.sh "/some-prompt"  # any prompt/skill
+#   MAX_STEPS=100 skills/continue/loop.sh   # env overrides the settings.json default
 #
 # The step cap defaults to docs/<root>/settings.json's execution.maxSteps (read via
 # jq), falling back to 50; the MAX_STEPS env var always overrides.

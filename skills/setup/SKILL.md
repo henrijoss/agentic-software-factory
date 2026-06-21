@@ -42,7 +42,8 @@ lives where it can't go stale — harvested by reference in `constitution`, read
 - **Output:** the bootstrapped tree root — a minimal `index.md` (tree map + ID registry + status
   dashboard) and a `settings.json` (version pin + execution prefs) at `docs/<root>/`, with status
   reflecting greenfield vs brownfield (+ stack), ready for the first phase. No other artifact — no code
-  inventory.
+  inventory. Plus an interactive **next-step hand-off** (step / loop / manual — see Step 6) so the
+  operator knows how to drive from here; interactive-only, nothing persisted.
 
 ## Process
 
@@ -94,12 +95,33 @@ Write `gateOverrides` as `{}`; it is the per-phase escape hatch, edited by hand 
 Do not interrogate the operator for every key; the rest are defaulted and editable by hand later. Never
 prompt for `version` — it is taken from the skillset, not the operator.
 
-### 6. Hand off
+### 6. Hand off — report, then show what to do next
 
-Report the root path and that the project is bootstrapped. Hand off to `constitution` (or whatever the
-operator's entry intent is) — when brownfield, note that `constitution` should **harvest** existing
-standing docs and capture existing-system facts as references/constraints. From here on, the drivers
-discover this `index.md` automatically and ingest each phase's emitted result into it.
+Report the root path and that the project is bootstrapped. When brownfield, note that `constitution`
+should **harvest** existing standing docs and capture existing-system facts as references/constraints.
+From here on, the driver discovers this `index.md` automatically and ingests each phase's emitted result
+into it.
+
+Then, as the message's **last block**, present the **next-step hand-off** — there are three ways to
+drive the project from here, and the operator should not have to guess which. Use the same capability
+ladder the driver's gate hand-off uses (`skills/continue/references/presentation.md`): **prefer an
+interactive picker** (in Claude Code, `AskUserQuestion`), **fall back to a `── NEXT ──` text footer**
+when no picker is available, and in **non-interactive/headless mode emit neither** (no human to act on
+it — just report the root and let the loop proceed). The options, first = recommended:
+
+1. **Step through it now** — run the next step interactively: `continue` runs the first phase
+   (`constitution`) and stops at its gate; repeat `/continue` per step, staying in control. **Selecting
+   this proceeds into that first step now.**
+2. **Run it unattended** — from the project root run `skills/continue/loop.sh`. It relaunches
+   `claude -p "/continue"` as a **fresh process per step** (context zeroed each step; `index.md` is the
+   carried memory), reading `.sdlc/loop-control` to advance / `halt` / finish. It honors `gatePolicy`:
+   the default `manual` halts at every gate, so set `auto` or `milestones` in `settings.json` for longer
+   unattended stretches (`MAX_STEPS` / `execution.maxSteps` caps the run).
+3. **Work with the skills by hand** — invoke a single phase skill directly for a one-off, then run
+   `/continue` afterward to persist it into the tree.
+
+Selecting option 1 continues into the first step; options 2 and 3 stop here, having shown the operator
+exactly what to run.
 
 ## Composability (big↔small)
 
@@ -119,6 +141,8 @@ Either way there is exactly one tree with one entry point.
 - Redefining the tree structure here instead of deferring to the `continue` base skill.
 - Omitting `settings.json`, or prompting for `version` / interrogating the operator for every key —
   `version` comes from the skillset, and only the relevant prefs are lightly confirmed; the rest default.
+- Handing off silently — reporting the root but not showing the three ways forward (step / loop / manual)
+  — leaving the operator to guess the entry point. (Skip the picker only in headless mode.)
 
 ## Verification
 
@@ -133,3 +157,5 @@ Either way there is exactly one tree with one entry point.
       (`verifyMode`, `reviewLoops`, `gatePolicy`), `version` not prompted.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.
+- [ ] Next-step hand-off presented the three paths (step / loop / manual) as the last block — picker or
+      `── NEXT ──` footer interactively, with the one-line `loop.sh` explanation; nothing in headless mode.

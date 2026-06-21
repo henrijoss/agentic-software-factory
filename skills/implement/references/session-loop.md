@@ -17,10 +17,12 @@ The fresh-context loop is the middle path: each session starts clean but reads a
 ever-longer conversation. This is the same discipline as the GitHub-issues backend's Session-Context
 issue — the handoff is the durable memory; the session is disposable.
 
-This per-**task** loop is the *inner* instance of the driver-level per-**step** loop the `continue`
-base skill defines in `references/fresh-context.md` (where `index.md` is the cross-step handoff and
-`skills/orchestrator/loop.sh` gives a fresh process per step). A single `implement` step may run
-several task-sessions before the step writes its gate decision and the outer loop advances.
+There is **no separate inner in-session loop**: one task = one session = one step. The per-**task** loop
+*is* the driver-level per-**step** fresh-process loop the `continue` base skill defines in
+`references/fresh-context.md` — `skills/continue/loop.sh` relaunches a brand-new session for each task,
+so each task gets truly fresh context. The cross-task handoff is the **SessionSummary** exactly as the
+cross-phase handoff is `index.md`. A slice's `implement` phase therefore spans as many sessions as it
+has tasks; this invocation implements one of them and stops.
 
 ## Context-loading discipline (Step 1)
 
@@ -37,11 +39,15 @@ against it.
 
 ## What goes in the SessionSummary
 
-It is a handoff to a future agent (possibly you, with no memory of now). It answers, tersely:
+It is a handoff to a future agent (the next session, with no memory of now). It answers, tersely:
 
-- **Done** — what was completed this slice (tasks, changes), enough to not redo it.
-- **Next** — the immediate next task and the exact place to start.
-- **Open** — unresolved decisions, blockers, things to watch, deferred-but-noted scope items.
+- **Done** — the tasks completed so far, enough to not redo them. This **accumulates across sessions**:
+  each session appends the one task it finished.
+- **Next** — the single immediate next task and the exact place to start (the driver confirms this
+  against the authoritative per-task status in `index.md`).
+- **Open** — unresolved decisions, blockers, things to watch, deferred-but-noted scope items (including
+  any follow-up task discovered mid-flight — surfaced here for `to-tasks`, never minted as a task by
+  `implement` itself).
 - **Touched** — key files/areas changed, so the next session knows where the work lives.
 
 Keep it tight — it's a pointer into the work, not a transcript. Each session emits the latest summary;
@@ -70,7 +76,9 @@ the driver **overwrites the prior summary in place** (anti-staleness), never for
 - **`incremental`** governs *within* a session: thin slices, verify each, keep compilable, hold
   scope. The SessionSummary records the boundary *between* sessions.
 - **`doubt`** is invoked at decision points inside a session; if a doubt cycle is left unresolved at
-  session end, record it under **Open** so it isn't silently dropped.
+  session end, record it under **Open** so it isn't silently dropped. Because each task runs in its own
+  top-level session (not a nested subagent), `doubt` can spawn its fresh-context reviewer normally — the
+  one-task-per-session loop preserves that guarantee per task.
 - **`verify`/`test`** is the per-task completion gate; the SessionSummary's **Done** should only list
   tasks that passed it.
 

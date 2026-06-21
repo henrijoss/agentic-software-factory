@@ -25,11 +25,13 @@ Three ways to "reset" between steps, only one of which actually zeroes the trans
 2. **Operator `/clear` + `/continue`** — true reset, but a human presses the button each step. The
    agent cannot wipe its own transcript.
 3. **Fresh process per step** (this loop) — each step is a brand-new `claude` process that reads
-   `index.md` cold, runs one phase, and exits. **The only true zero**, and unattended. Because each
-   step is a top-level process (not a subagent), `doubt` can still spawn its reviewer normally — the
-   nesting problem of option 1 does not arise.
+   `index.md` cold, runs one step (one phase, or one `implement` task), and exits. **The only true
+   zero**, and unattended. Because each step is a top-level process (not a subagent), `doubt` can still
+   spawn its reviewer normally — the nesting problem of option 1 does not arise.
 
-`loop.sh` implements option 3.
+`skills/continue/loop.sh` implements option 3 — the standard way to run the SDLC unattended (option 2 is
+the attended single-step equivalent; the agent cannot relaunch itself, so the loop lives in the script,
+launched once from a terminal).
 
 ## The loop-control contract (non-interactive mode)
 
@@ -65,15 +67,15 @@ gates pause for a human.
 
 Interactive `/continue` is unchanged: it presents the gate to the operator and writes no control file
 (single-step `continue` is inherently manual — the operator is the loop). `gatePolicy` shapes the
-auto-advance decision, which only `orchestrator` and this headless loop make.
+auto-advance decision, which only this headless loop makes.
 
 ## Running the loop
 
 ```bash
 # from the project root (where .sdlc/ and docs/<root>/ live):
-skills/orchestrator/loop.sh                  # drives /continue, up to MAX_STEPS (default 50)
-skills/orchestrator/loop.sh "/orchestrator"  # drive a different prompt/skill
-MAX_STEPS=100 skills/orchestrator/loop.sh    # go further
+skills/continue/loop.sh                  # drives /continue, up to MAX_STEPS (default 50)
+skills/continue/loop.sh "/some-prompt"   # drive a different prompt/skill
+MAX_STEPS=100 skills/continue/loop.sh    # go further
 ```
 
 Each iteration prints a `── step N ──` banner, clears `.sdlc/loop-control`, runs the fresh process,
@@ -83,11 +85,12 @@ sequences cold processes.
 
 ## How it nests with the other loops
 
-- **`implement`'s session-loop** is the *inner* fresh-context loop — fresh context per **task** within
-  the `implement` phase. This step loop is the *outer* one — fresh context per **phase/step**. A single
-  `implement` step may itself run several task-sessions before it writes its `loop-control`.
+- **`implement`'s per-task loop is not a separate inner loop** — each task *is* a step/process here.
+  Within the `implement` phase one task runs per process and writes its `loop-control`, so a slice's
+  `implement` spans as many processes as it has tasks. The SessionSummary is the within-slice handoff
+  (`skills/implement/references/session-loop.md`), exactly as `index.md` is the cross-phase handoff.
 - **`doubt`** rests on the same fresh-context principle (a reviewer that hasn't seen your reasoning).
   Because each step here is a full process, `doubt` spawns its reviewer normally — no nesting limit.
-- **`orchestrator`** is the single-session counterpart: same phase graph and gates, but auto-advancing
-  *inside one session* (context grows). Use `orchestrator` for an attended run where you want the
-  transcript; use `loop.sh` for a long unattended run where you want context zeroed each step.
+- **This loop is the only driver.** There is no in-session multi-step counterpart; interactive
+  single-step `continue` (option 2 above, a human stepping each gate) is the attended equivalent. For an
+  unattended run, this script is the one way to walk the loop with context zeroed each step.

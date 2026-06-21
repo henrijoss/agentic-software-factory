@@ -1,7 +1,7 @@
 # Handoff — Result Contract, Ingest & Input-Assembly (depth)
 
-Loaded on demand by the `continue` base skill (and inherited by `orchestrator`). This is
-the **seam** between the system skills (`setup`, `continue`, `orchestrator`) and every
+Loaded on demand by the `continue` base skill. This is
+the **seam** between the system skills (`setup`, `continue`) and every
 other skill. The other skills are **pure, system-agnostic transforms**: they know nothing
 of the artifact tree, `index.md`, stable IDs, storage paths, or which skill runs next.
 They take inputs the caller provides and **emit a result**; the driver does everything
@@ -67,14 +67,20 @@ Steps:
    binding table). **In-place update / no-fork:** re-entry overwrites the existing file;
    never create a parallel copy. New fan-out artifacts create their dir + file.
 4. **Register.** Add/update the ID → path row and the status in `index.md` (tree map +
-   ID registry + status dashboard).
+   ID registry + status dashboard). An **`implement`** ingest touches **two** rows: it
+   writes the `[REQ-n.SESSION]` SessionSummary in place **and** sets the just-finished
+   `[REQ-n.TASK-m]` status (`done`, or `blocked`) — the per-task status the next step reads
+   to pick the next task.
 5. **Gate-validate.** Run the structural validation (dangling / duplicate / orphan /
    unreachable → fail and surface). A `to-*` fan-out registers **all** produced artifacts
    before validating.
 6. **Present the gate.** Pose the decision (canonical question from `phase-graph.md`, or
-   the transform's `gate` when it adds specificity) — never "looks good?".
-7. **Advance or stop.** `continue` stops; `orchestrator` auto-advances on explicit
-   approval. Then **clear** `.sdlc/scratch/`.
+   the transform's `gate` when it adds specificity) — never "looks good?". Inside
+   `implement`, a finished task with more tasks remaining is **not** a gate — just stop;
+   only the last task reaches the implement→verify gate.
+7. **Stop.** The step always stops here — the session ends. Advancing to the next step is
+   the operator's `continue` (interactive) or the `loop.sh` fresh-process loop, never an
+   in-session walk. Then **clear** `.sdlc/scratch/`.
 
 The in-place-update and gate-validation invariants live here in the driver — phase
 skills no longer restate them.
@@ -94,7 +100,7 @@ which phase comes from the **consumed-by** column of the artifact table in
 | `clarify` | one draft `[REQ-n]`, `[CONST]` |
 | `design` | one `[REQ-n]`, `[CONST]`; prior `[REQ-n.DESIGN]` on re-entry (code read live by the skill itself) |
 | `to-tasks` | `[REQ-n.DESIGN]`, `[CONST]` |
-| `implement` | the slice's `[REQ-n.TASK-*]`, prior `[REQ-n.SESSION]`, `[CONST]` |
+| `implement` | the **single** next `[REQ-n.TASK-m]` (lowest non-`done` task whose deps are met — driver-selected), prior `[REQ-n.SESSION]`, `[CONST]` |
 | `verify`/`test` | the change + the slice's `[REQ-n]`/tasks |
 | `review` | the implemented slice, `[STK-n]`, `[CONST]` |
 | `deploy` | the reviewed change, `[CONST]` |

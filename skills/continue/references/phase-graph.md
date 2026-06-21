@@ -1,8 +1,8 @@
 # Phase Graph — Sequencing (depth)
 
-Loaded on demand by the `continue` base skill (and referenced by `orchestrator`). The canonical phase
-graph, gate-decision table, entry modes, and the tree-root bootstrap procedure. Both drivers walk this
-graph; `continue` runs one step of it, `orchestrator` auto-advances along it.
+Loaded on demand by the `continue` base skill. The canonical phase
+graph, gate-decision table, entry modes, and the tree-root bootstrap procedure. `continue` walks this
+graph one step at a time; the `loop.sh` fresh-process loop relaunches it per step to advance along it.
 
 ## The phase graph
 
@@ -50,14 +50,14 @@ the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column 
 even within a driven session; review approval ≠ ship approval.
 
 These decision questions are what the interactive call-to-action surfaces — editing a question here
-changes user-facing gate copy (the drivers render it per `references/presentation.md`). This table stays
+changes user-facing gate copy (the driver renders it per `references/presentation.md`). This table stays
 the single source of the questions; no display format lives here.
 
 ### Gate autonomy (`gatePolicy`)
 
 How much human review the loop requires at these gates is set by `settings.execution.gatePolicy`
 (`manual` | `milestones` | `auto`, default `manual`) with optional per-phase `gateOverrides` — consumed
-only by the drivers (the schema lives in the `continue` base skill's *Settings* subsection). At each
+only by the driver (the schema lives in the `continue` base skill's *Settings* subsection). At each
 gate the driver resolves *pause vs. advance* by precedence: **safety floor** (⚠ above, plus failed
 gate-validation, a held sync gate, an ambiguous next phase, and a major version mismatch — always
 pause/halt) → `gateOverrides[<phase>]` (`pause`/`auto`) → `gatePolicy` (`manual` pauses all; `auto`
@@ -94,8 +94,8 @@ artifact. The root is **discovered**, and creation is **idempotent**:
 2. **A driver resolves/falls back.** At session start, discover the single `index.md`; if none exists,
    create the **default** `docs/sdlc/` minimal root. An existing tree is left untouched — never forked.
 
-Only `setup` and the two drivers create/write the tree. A standalone phase/transition skill creates no
-tree — it emits a result the operator ingests by running `continue`.
+Only `setup` and the `continue` driver create/write the tree. A standalone phase/transition skill
+creates no tree — it emits a result the operator ingests by running `continue`.
 
 The discovery rule, minimal root, and full rationale live in the `continue` base skill and
 `references/artifact-io.md`. This keeps the four invariants (single entry point / single tree / ID

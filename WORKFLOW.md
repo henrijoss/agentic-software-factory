@@ -1,19 +1,19 @@
 # SDLC Skillset — Workflow & Architecture
 
 This skillset covers every phase of the software-development lifecycle as a set of small,
-composable agent skills, chained through **human gates** by thin drivers (`continue`, `orchestrator`)
-built on a `continue` base skill. This document is
+composable agent skills, chained through **human gates** by the thin `continue` driver (which is also
+the base skill), with a fresh-process loop script for unattended runs. This document is
 the canonical map: the roster, the iterative loop, the composition model, the artifact tree, and the
 calling conventions. Individual `SKILL.md` files implement the behavior; this file defines how they
 fit together.
 
-> **Authoring status.** Complete. All 14 phase/transition/posture skills plus the two drivers
-> (`continue`, `orchestrator`) are authored against this spec (lean `SKILL.md` + `references/` each);
+> **Authoring status.** Complete. All 14 phase/transition/posture skills plus the `continue` driver
+> are authored against this spec (lean `SKILL.md` + `references/` each);
 > the mined reference drafts have been consumed and deleted. This document remains the canonical map.
 > Shared structure/storage knowledge lives in the **`continue` base skill** (see
 > `skills/continue/SKILL.md` and its `references/`); the tree-root **bootstrap** is owned solely by
-> `setup` and the two drivers — non-system skills are pure transforms that emit a result and create no
-> tree (the result contract + assemble/ingest seam live in `references/handoff.md`).
+> `setup` and the `continue` driver — non-system skills are pure transforms that emit a result and
+> create no tree (the result contract + assemble/ingest seam live in `references/handoff.md`).
 
 ## Design principles (locked)
 
@@ -31,9 +31,9 @@ fit together.
    — phases never write the tree themselves (principle 5). In-place update only catches
    drift introduced **through** the system; the **drift sync** (below) closes the complementary blind
    spot — code committed **outside** the system between sessions. `index.md` records the last reconciled
-   commit, and both drivers compare it to `HEAD` at session start, holding a sync gate on any external
+   commit, and the driver compares it to `HEAD` at session start, holding a sync gate on any external
    delta so already-resolved/invalidated work is reconciled before the loop advances. Defined in the
-   `continue` base skill (`references/sync.md`); inherited by `orchestrator`.
+   `continue` base skill (`references/sync.md`).
 4. **Every gate earns its interruption.** A human gate sits on every phase→phase arrow, but a gate
    must surface crucial information or force a real decision — never "looks good?". A gate with
    nothing to decide is a design smell, not a step. **Whether a human is *prompted* at a routine gate
@@ -41,12 +41,12 @@ fit together.
    `manual`) with per-phase `gateOverrides` — but the gate and its **gate-validation still run on every
    transition**, and a **non-negotiable safety floor** (`deploy`/irreversible, sync drift, failed
    validation, ambiguous phase, major version mismatch) always stops, whatever the policy. Consumed
-   only by the drivers; phases never see it. Defined in the `continue` base skill's *Settings* and
+   only by the driver; phases never see it. Defined in the `continue` base skill's *Settings* and
    *Gate autonomy* notes.
-5. **Base/init skills + thin drivers, pure standalone skills.** Only three skills know "the system" —
-   the artifact tree, `index.md`, stable IDs, storage, and chaining: `setup` (init), the `continue`
-   **base skill** (which defines that structure + phase graph and is the default driver that runs the
-   **next single phase** and stops), and `orchestrator` (the full-loop variant built on `continue`).
+5. **Base/init skills + a thin driver, pure standalone skills.** Only two skills know "the system" —
+   the artifact tree, `index.md`, stable IDs, storage, and chaining: `setup` (init) and the `continue`
+   **base skill** (which defines that structure + phase graph and is the sole driver that runs the
+   **next single step** — one phase, or one `implement` task — and stops).
    **Every other skill is a pure, system-agnostic transform**: it takes inputs the driver provides and
    **emits a result** (the result contract) knowing nothing of the tree/IDs/storage/next-skill. The
    driver **assembles** a phase's inputs before and **ingests** its result after — the only writes to
@@ -54,26 +54,31 @@ fit together.
    artifacts) write `.sdlc/scratch/` files. Postures may still be composed (they're generic, not the
    system). Every skill is thus directly invocable on its own — standalone, it just emits its result
    and creates no tree. See the `continue` base skill's `references/handoff.md`.
-6. **Auto-advance only when asked for it.** `continue` runs one phase, holds its gate, and stops —
-   the operator drives step by step (inherently manual; the operator is the loop). `orchestrator` is
-   the opt-in variant that auto-advances to the next phase — at each gate it consults `gatePolicy`:
-   under `manual` it waits for an explicit "yes" (the prior behavior), under `milestones`/`auto` it
-   auto-advances routine gates and stops only at milestone/safety-floor gates. The headless `loop.sh`
-   encodes the same decision in `.sdlc/loop-control` (principle 8).
+6. **One step per session; advancing is the loop's job, never an in-session walk.** `continue` runs one
+   step (one phase, or one `implement` task), holds its gate, and stops — the session ends there. There
+   is no in-session multi-step driver: the agent cannot wipe its own transcript, so unattended runs use
+   the fresh-process `loop.sh` (principle 8), which relaunches `continue` per step. At each gate the
+   headless step consults `gatePolicy` and records the decision in `.sdlc/loop-control`: under `manual`
+   it `halt`s for an explicit "yes", under `milestones`/`auto` it `continue`s past routine gates and
+   `halt`s only at milestone/safety-floor gates. A finished `implement` task that is not the slice's
+   last is not a gate — it simply `continue`s to the next task's fresh session.
 7. **Lean, reliability-first skills.** Frontier models reliably follow only ~150–200 standing
    instructions before compliance degrades. Each `SKILL.md` is a thin operational core under that
-   ceiling; depth (rationale, examples, tables) lives in `references/` loaded on demand. The drivers
-   load one phase skill at a time.
+   ceiling; depth (rationale, examples, tables) lives in `references/` loaded on demand. The driver
+   loads one phase skill at a time.
 8. **Fresh context per step.** A step is self-contained: it resumes from `index.md` and ends by writing
    its result back, so the conversation is disposable and `index.md` is the only memory carried across
-   steps. This lifts the `implement` session-loop's fresh-context discipline (`skills/implement/
-   references/session-loop.md`) to the driver/step level — the same defense against the ever-growing
-   session (stale detail, hardened assumptions, degraded compliance), now between phases. Loading one
-   skill at a time (principle 7) bounds the *instructions*; this bounds the *transcript*. The only true
-   reset is a fresh process per step: `skills/orchestrator/loop.sh` runs each step as a new
-   `claude -p "/continue"`. A headless step records its gate in `.sdlc/loop-control`
-   (`continue`/`halt: <reason>`/`done`) so `halt` gates still stop for a human — principle 4 holds
-   without one in the loop. Defined in the `continue` base skill (`references/fresh-context.md`).
+   steps. A step is one phase — except in `implement`, where each step is a **single task** (the
+   SessionSummary is the within-slice handoff), so every task gets a fresh session. The `implement`
+   session-loop's fresh-context discipline (`skills/implement/references/session-loop.md`) is no longer
+   a separate inner loop: it *is* this step loop applied per task. This is the defense against the
+   ever-growing session (stale detail, hardened assumptions, degraded compliance), now at both phase and
+   task granularity. Loading one skill at a time (principle 7) bounds the *instructions*; this bounds the
+   *transcript*. The only true reset is a fresh process per step: `skills/continue/loop.sh` (run once
+   from a terminal) launches each step as a new `claude -p "/continue"`. A headless step records its
+   gate in `.sdlc/loop-control` (`continue`/`halt: <reason>`/`done`) so `halt` gates still stop for a
+   human — principle 4 holds without one in the loop. Defined in the `continue` base skill
+   (`references/fresh-context.md`).
 
 ## Three skill categories
 
@@ -103,10 +108,10 @@ Folder name always equals the frontmatter `name`.
         └──────────────────────── maintain feeds discovered work back into specify (loop closes) ──────────────────────────────────┘
 ```
 
-- Every `─▶` is a **human gate** (principle 4). A driver pauses and presents the decision; `continue`
-  stops there, `orchestrator` auto-advances on explicit approval (principle 6). How many of these gates
-  actually prompt a human is set by `gatePolicy` (`manual`/`milestones`/`auto`); routine gates may
-  auto-advance, but the safety-floor gates always stop.
+- Every `─▶` is a **human gate** (principle 4). `continue` presents the decision and stops there; the
+  session ends, and the `loop.sh` fresh-process loop relaunches it for the next step (principle 6). How
+  many of these gates actually halt the headless loop for a human is set by `gatePolicy`
+  (`manual`/`milestones`/`auto`); routine gates may auto-advance, but the safety-floor gates always stop.
 - The loop runs **per vertical slice** (principle 2). A second slice re-enters `specify`/`design`
   with the constitution and prior artifacts already in place, updating them in place (principle 3).
 - `to-requirements` and `to-tasks` additionally pause for user feedback while fanning out.
@@ -131,14 +136,15 @@ Folder name always equals the frontmatter `name`.
 
 - **Init (once):** invoke `setup` to choose where the tree is generated (default `docs/sdlc/`) and
   scaffold its single `index.md`. It also orients greenfield vs brownfield (+ stack), recorded as
-  `index.md` status — detection only, no code inventory. Optional — a driver falls back to the
-  default root if skipped (only `setup`/`continue`/`orchestrator` ever create the tree).
-- **Next step (default):** invoke `continue`; it reads `index.md`, **assembles** the next phase's
-  inputs, runs that one phase, **ingests** its emitted result into the tree, holds the gate, and stops.
-  Run it again for the following step.
-- **Full project (unattended):** invoke the `orchestrator`; it walks the loop, gating and
-  auto-advancing through every phase (same assemble/ingest around each).
-- **Sub-chain:** invoke `continue`/`orchestrator` starting mid-loop (e.g. a known requirement →
+  `index.md` status — detection only, no code inventory. Optional — the driver falls back to the
+  default root if skipped (only `setup`/`continue` ever create the tree).
+- **Next step (default):** invoke `continue`; it reads `index.md`, **assembles** the next step's
+  inputs, runs that one phase (or one `implement` task), **ingests** its emitted result into the tree,
+  holds the gate, and stops. Run it again for the following step.
+- **Full project (unattended):** run `skills/continue/loop.sh` once from a terminal; it relaunches
+  `continue` as a fresh process per step, walking the loop and gating via `.sdlc/loop-control` (same
+  assemble/ingest around each, context zeroed between steps).
+- **Sub-chain:** invoke `continue` starting mid-loop (e.g. a known requirement →
   `design`) without earlier phases.
 - **Single skill:** invoke one phase skill directly for a one-off (e.g. `implement` a typo fix). It
   emits its result and creates **no tree**; run `continue` afterward if you want it persisted.
@@ -176,9 +182,9 @@ docs/<root>/          ← chosen at `setup`; default `docs/sdlc/`
 
 **Single entry point.** `index.md` is the root object; every artifact is reachable by walking down
 from it. It plays three roles at once: **(a) tree map** (navigable structure), **(b) ID registry**
-(ID → path), **(c) live status dashboard** (each artifact's current phase/gate state). A driver
-(`continue` or `orchestrator`) reads `index.md` to know where the project stands and updates it as
-phases advance.
+(ID → path), **(c) live status dashboard** (each artifact's current phase/gate state, including
+per-task `pending`/`in-progress`/`done`/`blocked` status that drives the `implement` step loop). The
+driver (`continue`) reads `index.md` to know where the project stands and updates it as steps advance.
 
 **Reference discipline — stable IDs + validated registry.** Every artifact has a stable, rename-safe
 ID. Cross-references target IDs resolved through `index.md`, never raw paths buried in prose. A
@@ -191,8 +197,8 @@ enforces "no stale references" and complements the in-place-update anti-stalenes
 holds at every size.
 
 **Settings & versioning.** `settings.json` sits beside `index.md` and is a **system file** (no ID, not
-an artifact): only `setup`/`continue`/`orchestrator` read or write it. It pins the `version` the tree
-was created/migrated with — the drivers run a **semver-aware compatibility check** at session start
+an artifact): only `setup`/`continue` read or write it. It pins the `version` the tree
+was created/migrated with — the driver runs a **semver-aware compatibility check** at session start
 (major mismatch halts for a migration/override; same-major-newer bumps the recorded version forward;
 same-major-older warns) — plus tweakable `execution` prefs: `maxSteps` (the `loop.sh` step cap),
 `verifyMode` (`test`/`verify`/`both`/`ask`), `reviewLoops` (adversarial `doubt` passes), `gatePolicy`
@@ -227,7 +233,7 @@ Each row = one standalone skill a driver can chain. Folder name MUST equal front
 | `specify` | idea → **Specification** (objective, scope, success criteria) |
 | `clarify` | one draft **Requirement** → ready Requirement (human deep-dive; engine = `interview`) |
 | `design` | one **Requirement** → implementation **Plan** (approach, architecture, risks) |
-| `implement` | a slice's **Tasks** → working code, fresh-context loop, follows `incremental` |
+| `implement` | one **Task** → working code (one task per fresh session; SessionSummary handoff), follows `incremental` |
 | `verify` / `test` | a change → behavioral confirmation and/or TDD tests (gate) |
 | `review` | implemented slice → findings + improvements (may invoke `doubt`) |
 | `deploy` | reviewed change → shipped (build / prerender / publish per project) |
@@ -251,12 +257,11 @@ Each row = one standalone skill a driver can chain. Folder name MUST equal front
 > `design` + `to-tasks` are the two halves the example `plan-implementation` draft conflated
 > ("produce a plan" vs. "split into tasks"). The architecture keeps them split.
 
-### Drivers
+### Driver
 
 | Skill | Role |
 |---|---|
-| `continue` | base skill: defines the structure (artifact tree, storage, invariants, bootstrap, phase graph), loaded whenever working in the system; default driver — runs the **next single phase** and stops at its gate |
-| `orchestrator` | full-loop driver, built on `continue`: walks the whole graph and **auto-advances** through gates on approval for unattended runs |
+| `continue` | base skill **and sole driver**: defines the structure (artifact tree, storage, invariants, bootstrap, phase graph), loaded whenever working in the system; runs the **next single step** (one phase, or one `implement` task) and stops at its gate. Its `loop.sh` relaunches it per step for unattended full-loop runs |
 
 ## Testing & verification strategy
 
@@ -297,7 +302,7 @@ Authored in dependency order (all ✅):
 
 `constitution` → `interview` → `specify` → `incremental` + `doubt` → `design` → `to-tasks` →
 `implement` → `verify`/`test` → `review` → `to-requirements` → `clarify` → `deploy` → `maintain` →
-`continue` + `orchestrator` (drivers last; needed the phases to exist) → `setup` (init front door for
+`continue` (driver last; needed the phases to exist) → `setup` (init front door for
 the configurable tree root).
 
 Authoring contract (held by every skill): folder name = frontmatter `name`; abstract Inputs/Outputs

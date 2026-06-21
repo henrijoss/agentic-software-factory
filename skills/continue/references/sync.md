@@ -1,9 +1,9 @@
 # Sync — Git Drift Detection (depth)
 
-Loaded on demand by the `continue` base skill (and inherited by `orchestrator`). Defines the
-**sync check**: how a driver detects code committed **outside** the system since it last ran, and
-reconciles the artifact tree against it. Both drivers run this at session start, after resolving the
-tree root and before determining the next phase.
+Loaded on demand by the `continue` base skill. Defines the
+**sync check**: how the driver detects code committed **outside** the system since it last ran, and
+reconciles the artifact tree against it. The driver runs this at session start, after resolving the
+tree root and before determining the next step.
 
 ## Why this exists
 
@@ -69,7 +69,8 @@ On real drift, hold a gate like any other — surface the **decision**, never "l
 > the design assumption in `[REQ-…]`. Which open work do you want to mark resolved, re-confirm, or
 > re-open — and what re-enters the loop?
 
-In `orchestrator`, this gate holds like every other: no auto-advance past unresolved drift.
+In the headless `loop.sh` loop, this gate holds like every other safety-floor gate: it always writes
+`halt` — no auto-advance past unresolved drift, whatever the `gatePolicy`.
 
 ## Reconciliation routing
 
