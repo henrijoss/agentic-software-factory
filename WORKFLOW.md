@@ -36,7 +36,13 @@ fit together.
    `continue` base skill (`references/sync.md`); inherited by `orchestrator`.
 4. **Every gate earns its interruption.** A human gate sits on every phase→phase arrow, but a gate
    must surface crucial information or force a real decision — never "looks good?". A gate with
-   nothing to decide is a design smell, not a step. (Gates may be relaxed later if proven needless.)
+   nothing to decide is a design smell, not a step. **Whether a human is *prompted* at a routine gate
+   is configurable** via `settings.execution.gatePolicy` (`manual`/`milestones`/`auto`, default
+   `manual`) with per-phase `gateOverrides` — but the gate and its **gate-validation still run on every
+   transition**, and a **non-negotiable safety floor** (`deploy`/irreversible, sync drift, failed
+   validation, ambiguous phase, major version mismatch) always stops, whatever the policy. Consumed
+   only by the drivers; phases never see it. Defined in the `continue` base skill's *Settings* and
+   *Gate autonomy* notes.
 5. **Base/init skills + thin drivers, pure standalone skills.** Only three skills know "the system" —
    the artifact tree, `index.md`, stable IDs, storage, and chaining: `setup` (init), the `continue`
    **base skill** (which defines that structure + phase graph and is the default driver that runs the
@@ -49,8 +55,11 @@ fit together.
    system). Every skill is thus directly invocable on its own — standalone, it just emits its result
    and creates no tree. See the `continue` base skill's `references/handoff.md`.
 6. **Auto-advance only when asked for it.** `continue` runs one phase, holds its gate, and stops —
-   the operator drives step by step. `orchestrator` is the opt-in variant that, on an explicit "yes"
-   at each gate, auto-advances to the next phase — one continuous driven session.
+   the operator drives step by step (inherently manual; the operator is the loop). `orchestrator` is
+   the opt-in variant that auto-advances to the next phase — at each gate it consults `gatePolicy`:
+   under `manual` it waits for an explicit "yes" (the prior behavior), under `milestones`/`auto` it
+   auto-advances routine gates and stops only at milestone/safety-floor gates. The headless `loop.sh`
+   encodes the same decision in `.sdlc/loop-control` (principle 8).
 7. **Lean, reliability-first skills.** Frontier models reliably follow only ~150–200 standing
    instructions before compliance degrades. Each `SKILL.md` is a thin operational core under that
    ceiling; depth (rationale, examples, tables) lives in `references/` loaded on demand. The drivers
@@ -95,7 +104,9 @@ Folder name always equals the frontmatter `name`.
 ```
 
 - Every `─▶` is a **human gate** (principle 4). A driver pauses and presents the decision; `continue`
-  stops there, `orchestrator` auto-advances on explicit approval (principle 6).
+  stops there, `orchestrator` auto-advances on explicit approval (principle 6). How many of these gates
+  actually prompt a human is set by `gatePolicy` (`manual`/`milestones`/`auto`); routine gates may
+  auto-advance, but the safety-floor gates always stop.
 - The loop runs **per vertical slice** (principle 2). A second slice re-enters `specify`/`design`
   with the constitution and prior artifacts already in place, updating them in place (principle 3).
 - `to-requirements` and `to-tasks` additionally pause for user feedback while fanning out.
@@ -184,7 +195,9 @@ an artifact): only `setup`/`continue`/`orchestrator` read or write it. It pins t
 was created/migrated with — the drivers run a **semver-aware compatibility check** at session start
 (major mismatch halts for a migration/override; same-major-newer bumps the recorded version forward;
 same-major-older warns) — plus tweakable `execution` prefs: `maxSteps` (the `loop.sh` step cap),
-`verifyMode` (`test`/`verify`/`both`/`ask`), and `reviewLoops` (adversarial `doubt` passes). `setup`
+`verifyMode` (`test`/`verify`/`both`/`ask`), `reviewLoops` (adversarial `doubt` passes), `gatePolicy`
+(`manual`/`milestones`/`auto` — the human-in-the-loop dial, principle 4), and `gateOverrides` (per-phase
+`pause`/`auto`). `setup`
 writes it with defaults and lightly confirms only the relevant prefs; the rest are edited by hand.
 Settings-derived values reach a phase as **provided inputs** (e.g. the driver passes `reviewLoops` to
 `design`/`implement`/`review`) — no phase ever reads the file. The running version itself is the single

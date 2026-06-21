@@ -17,7 +17,11 @@ every phase of the software lifecycle and chain together through **human gates**
   `continue`/`orchestrator` start the driver compares it to `HEAD` and, on external commits made between
   sessions, holds a **sync gate** to reconcile open work (some tasks may already be resolved). Closes
   the blind spot in-place update alone can't see.
-- **A human gate on every transition.** Each gate must surface a real decision, never "looks good?".
+- **A human gate on every transition — as much or as little as you want.** Each gate must surface a
+  real decision, never "looks good?". How many of them stop for a human is configurable via
+  `gatePolicy` (`manual` = pause every gate, default; `milestones` = pause only the big ones; `auto` =
+  unattended) with per-phase overrides — but gate-validation runs at every transition and the safety
+  gates (`deploy`/irreversible, sync drift, failed validation) always stop, whatever the policy.
 - **Fresh context per step.** Each step resumes from `index.md` and ends by writing its result back, so
   the conversation is disposable. For long unattended runs, `skills/orchestrator/loop.sh` runs every
   step as a brand-new `claude -p "/continue"` process — context is zeroed each step, `index.md` is the
@@ -121,7 +125,7 @@ fails on any dangling, duplicate, orphan, or unreachable ID.
 
 Beside it, **`settings.json`** pins the skillset `version` the tree was created with (the drivers run a
 semver-aware compatibility check at session start — major mismatch halts) and holds tweakable
-`execution` prefs (`maxSteps`, `verifyMode`, `reviewLoops`). It's a system file written by `setup`/the
+`execution` prefs (`maxSteps`, `verifyMode`, `reviewLoops`, `gatePolicy`, `gateOverrides`). It's a system file written by `setup`/the
 driver bootstrap and read only by `setup`/`continue`/`orchestrator`; phases receive any
 settings-derived value as a provided input, never the file. See the
 [`continue`](skills/continue) base skill for the schema and the `SDLC_SKILLSET_VERSION` constant.

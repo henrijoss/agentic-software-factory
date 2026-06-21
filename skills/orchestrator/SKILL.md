@@ -50,8 +50,9 @@ phase graph, and the **sync/drift check** (`references/sync.md`). Resolve the tr
 single `index.md`; if none, `setup` or the fallback creates the default `docs/sdlc/` root + a default
 `settings.json`). The **version-compat check** and settings reads come for free here too — `continue`
 runs them at session start; a **major** version mismatch holds like any other gate (no auto-advance
-until migrated/overridden), and the configured `verifyMode`/`reviewLoops` flow through the base skill's
-phase-graph and input-assembly logic. Run the
+until migrated/overridden), and the configured `verifyMode`/`reviewLoops`/`gatePolicy` flow through the
+base skill's phase-graph, input-assembly, and gate-autonomy logic (`gatePolicy`/`gateOverrides` decide
+which gates this driver pauses at vs. auto-advances — see step 3). Run the
 sync check at session start; if external commits since `Last synced commit` are detected, hold the sync
 gate and reconcile **before** advancing — like every gate, no auto-advance past unresolved drift.
 Resolve the entry mode
@@ -68,21 +69,34 @@ does its work (invoking postures as it needs) and **emits a result** (in-context
 the tree. Then **ingest** the result: resolve/assign the ID, write to the tree (in place on re-entry),
 register in `index.md`, clear scratch.
 
-### 3. Hold the gate
+### 3. Hold the gate (per `gatePolicy`)
 
 Run **gate-validation** per the base skill (dangling / duplicate / orphan / unreachable → fail and
-surface). Present the phase's gate decision (the specific question from the graph, never "looks
-good?") and **wait for explicit approval**. A gate that surfaces nothing to decide is a smell — say so
-rather than rubber-stamping. Outward/irreversible gates (notably `deploy`) require their own explicit
-authorization regardless of prior approvals.
+surface). Then resolve *pause vs. advance* by the base skill's **gate-autonomy precedence** (safety
+floor → `gateOverrides[<phase>]` → `gatePolicy`):
+
+- **Safety floor → always pause** regardless of policy: failed gate-validation, a held **sync gate**
+  (external drift), `deploy` or any outward/irreversible action, an ambiguous next phase, a major
+  version mismatch. `deploy` carries its own explicit ship authorization — review approval ≠ ship
+  approval.
+- **Resolved `pause`** (`manual`, a milestone gate under `milestones`, or a `pause` override) → present
+  the phase's gate decision (the specific question from the graph, never "looks good?") and **wait for
+  explicit approval**. A gate that surfaces nothing to decide is a smell — say so rather than
+  rubber-stamping.
+- **Resolved `advance`** (`auto`, or a non-milestone gate under `milestones`, or an `auto` override) →
+  no prompt; fall through to step 4.
+
+With the default `gatePolicy: manual`, every gate is a `pause` — the orchestrator's prior
+"wait for explicit approval at every gate" behavior is unchanged.
 
 ### 4. Update status and AUTO-ADVANCE
 
-On explicit approval, update the artifact's status in `index.md`, then advance to the **next phase in
-the graph** and return to step 2 — this auto-advance is what distinguishes the orchestrator from
-`continue` (which stops after one phase). On rejection or a surfaced divergence, route per the phase
-(rework re-enters the phase; a stale upstream artifact re-enters `specify`/`design` for in-place
-update) — never auto-advance past an unresolved gate.
+On a resolved `advance` (or explicit approval at a `pause` gate), update the artifact's status in
+`index.md`, then advance to the **next phase in the graph** and return to step 2 — this auto-advance is
+what distinguishes the orchestrator from `continue` (which stops after one phase). On rejection or a
+surfaced divergence at a `pause` gate, route per the phase (rework re-enters the phase; a stale upstream
+artifact re-enters `specify`/`design` for in-place update) — never auto-advance past an unresolved or
+safety-floor gate.
 
 ### 5. Close or loop
 
@@ -116,7 +130,9 @@ actually needs; no phase or tree level is mandatory.
 
 - Reaching for the orchestrator when the user wanted one step — that's `continue`.
 - Loading several phase skills at once instead of one at a time (defeats the budget discipline).
-- Auto-advancing without **explicit** approval, or posing a "looks good?" gate with nothing to decide.
+- Auto-advancing without **explicit** approval at a `pause` gate, or posing a "looks good?" gate with
+  nothing to decide. (Under `auto`/`milestones`, a routine gate advancing *without* a prompt is correct
+  — but a **safety-floor** gate auto-advancing is never correct, whatever the policy.)
 - Re-implementing the base skill's structure/graph logic or a phase's logic in the orchestrator.
 - Skipping gate-validation between phases (lets a stale/broken tree propagate).
 - Forgetting bootstrap — running a phase with no `index.md` entry point.
@@ -132,8 +148,9 @@ actually needs; no phase or tree level is mandatory.
 - [ ] Entry mode resolved; single steps deferred to `continue`, single one-offs to the phase skill.
 - [ ] `index.md` entry point ensured (bootstrap idempotent) before any phase ran.
 - [ ] Exactly one phase skill loaded/run at a time, in graph order.
-- [ ] Gate-validation run between phases; every gate posed its real decision and got **explicit**
-      approval before auto-advancing; rejections routed, not skipped.
+- [ ] Gate-validation run between phases; each gate resolved per `gatePolicy`/`gateOverrides` — `pause`
+      gates posed their real decision and got **explicit** approval before advancing (rejections routed,
+      not skipped), `advance` gates auto-advanced, and the **safety floor** paused under every policy.
 - [ ] `index.md` status updated as each phase completed.
 - [ ] Loop closure handled (`maintain → specify`) for the next slice; in-place updates on re-entry.
 - [ ] For long unattended runs, the fresh-process loop (`loop.sh`) chosen over one growing session;

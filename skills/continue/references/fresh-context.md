@@ -42,14 +42,30 @@ gate-validation, it writes **`.sdlc/loop-control`** with exactly one of:
 | `halt: <reason>` | A human is required. | Stop and surface the reason. |
 | `done` | The slice/loop is complete. | Stop cleanly. |
 
-**`halt` is mandatory (never `continue`) for:** an ambiguous gate where the next phase isn't
-unambiguous; a **sync gate** holding external drift (`HEAD` != `Last synced commit`); `deploy` or any
-outward/irreversible action needing its own authorization; failed gate-validation
-(dangling/duplicate/orphan/unreachable); a rejected/uncertain decision a phase would otherwise guess.
-This preserves "a human gate on every transition" — the loop auto-advances only the gates that are
-genuinely routine, and stops the moment a real decision is owed.
+**`halt` is mandatory (never `continue`) for the safety floor:** an ambiguous gate where the next phase
+isn't unambiguous; a **sync gate** holding external drift (`HEAD` != `Last synced commit`); `deploy` or
+any outward/irreversible action needing its own authorization; failed gate-validation
+(dangling/duplicate/orphan/unreachable); a major version mismatch; a rejected/uncertain decision a phase
+would otherwise guess. These can never be auto-advanced, whatever the policy.
 
-Interactive `/continue` is unchanged: it presents the gate to the operator and writes no control file.
+**For every other (routine) gate, `gatePolicy` decides** (resolved by the base skill's gate-autonomy
+precedence: safety floor → `gateOverrides[<phase>]` → `gatePolicy`):
+
+| Resolved decision | Control written |
+|---|---|
+| Safety floor (always) | `halt: <reason>` |
+| `pause` — `manual`, a milestone gate under `milestones`, or a `pause` override | `halt: gate <phase> — gatePolicy=<policy>` |
+| `advance` — `auto`, a non-milestone gate under `milestones`, or an `auto` override | `continue` |
+
+So `gatePolicy: manual` halts at every gate (a human steps through each one), `auto` advances every
+routine gate (only the safety floor stops the loop), and `milestones` halts only at the milestone gates
+(`constitution`/`specify`/`design`/`review`) plus the floor. This preserves "a human gate on every
+transition" — the gate and its validation still run each step; `gatePolicy` only tunes which routine
+gates pause for a human.
+
+Interactive `/continue` is unchanged: it presents the gate to the operator and writes no control file
+(single-step `continue` is inherently manual — the operator is the loop). `gatePolicy` shapes the
+auto-advance decision, which only `orchestrator` and this headless loop make.
 
 ## Running the loop
 

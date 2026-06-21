@@ -112,7 +112,9 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
   "execution": {
     "maxSteps": 50,
     "verifyMode": "ask",
-    "reviewLoops": 1
+    "reviewLoops": 1,
+    "gatePolicy": "manual",
+    "gateOverrides": {}
   }
 }
 ```
@@ -127,6 +129,30 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
   driver needn't ask each slice (`ask` = prompt as before).
 - `execution.reviewLoops` — number of adversarial `doubt` passes per non-trivial decision; the driver
   passes it as an input to `design`/`implement`/`review`.
+- `execution.gatePolicy` — `manual | milestones | auto`; how much human review the loop requires at
+  phase-transition gates (default `manual` — autonomy is opt-in). It governs only whether the **driver
+  pauses for a human** at a gate; it never removes a gate or its validation (see below).
+- `execution.gateOverrides` — an object mapping a **just-completed phase name** → `pause | auto`,
+  overriding `gatePolicy` for that one gate (e.g. `{"design": "pause", "review": "pause"}`). Default
+  `{}`. (`verify`/`test` share the key `verify`.)
+
+**Gate autonomy (how `gatePolicy`/`gateOverrides` are applied).** This is a **system-skill concern** —
+only the drivers consult it; phase skills never see it (like every other setting). At each gate the
+driver resolves *pause vs. advance* by this precedence:
+
+1. **Safety floor first — always pause/halt, ignoring policy and overrides:** `deploy` or any
+   outward/irreversible action (ship authorization); a held **sync gate** (external drift); **failed
+   gate-validation** (dangling/duplicate/orphan/unreachable); an **ambiguous** next phase; a **major**
+   version mismatch. These are the same gates that `halt` headlessly — autonomy can never skip them.
+2. Else if `gateOverrides[<phase>]` is set → use it (`pause` or `auto`).
+3. Else apply `gatePolicy`: `manual` → pause; `auto` → advance; `milestones` → pause iff the phase is a
+   **milestone gate** (`constitution`, `specify`, `design`, `review` — the direction-defining,
+   costly-to-reverse decisions), else advance.
+
+A resolved **pause** means the driver presents the gate decision and waits (interactive) or writes
+`halt` (headless); a resolved **advance** means it auto-advances (interactive) or writes `continue`
+(headless). The gate and its **gate-validation still run on every transition** regardless of policy —
+only the human prompt at a *routine* gate is what `gatePolicy` relaxes.
 
 **Forward-compatible:** unknown keys are ignored and any missing key falls back to the default above, so
 new settings can be added without breaking older trees. `setup` writes the full file with defaults and
@@ -278,12 +304,15 @@ across gates is `orchestrator`'s job, not this skill's.)
 
 **Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
 the gate — e.g. driven by `skills/orchestrator/loop.sh`), do not pause. After ingest + gate-validation,
-write `.sdlc/loop-control` with exactly one of: `continue` (routine advance), `halt: <reason>` (a human
-is required), or `done` (the slice/loop is complete). **`halt` is mandatory — never `continue` — for:**
-an ambiguous next phase; a held **sync gate** (external drift); `deploy` or any outward/irreversible
-authorization; failed gate-validation; or a decision the phase would otherwise have to guess. This is
-how the human-gate-on-every-transition rule holds without a human in the loop. Full contract and the
-`halt` cases: `references/fresh-context.md`.
+write `.sdlc/loop-control` with exactly one of: `continue` (advance), `halt: <reason>` (a human is
+required), or `done` (the slice/loop is complete). Resolve which to write via the **gate-autonomy
+precedence** above: the **safety floor always `halt`s** — an ambiguous next phase, a held **sync gate**
+(external drift), `deploy` or any outward/irreversible authorization, failed gate-validation, a major
+version mismatch, or a decision the phase would otherwise have to guess; otherwise a resolved **pause**
+(from `gateOverrides` or `gatePolicy`) writes `halt: gate <phase> — gatePolicy=<policy>`, and a resolved
+**advance** writes `continue`. This is how the human-gate-on-every-transition rule holds without a human
+in the loop — and how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt`
+cases: `references/fresh-context.md`.
 
 ## Composability (big↔small)
 
@@ -307,6 +336,11 @@ tree levels a job needs ever materialize.
 - In non-interactive mode, writing `continue` to `.sdlc/loop-control` for a `halt`-worthy gate (sync
   drift, `deploy`/irreversible, ambiguous next phase, failed validation) — that auto-advances past a
   decision a human owes. When in doubt, `halt`.
+- Auto-advancing a **safety-floor** gate because `gatePolicy` is `auto`/`milestones` (or a
+  `gateOverrides` entry says `auto`) — the floor (`deploy`/irreversible, sync drift, failed validation,
+  ambiguous phase, major version mismatch) always stops, policy notwithstanding.
+- Treating `gatePolicy` as a license to **skip a gate or its gate-validation** — it only relaxes the
+  *human prompt* at a routine gate; the gate and its validation still run on every transition.
 - Carrying one step's working-context into the next instead of resuming cold from `index.md` — the
   ever-growing-session failure mode at step granularity.
 - Running a phase without the version-compat check, or auto-advancing past a **major** version mismatch
@@ -321,7 +355,10 @@ tree levels a job needs ever materialize.
       fallback) and the version-compat check run before any phase — major mismatch halted, same-major
       newer bumped the recorded version.
 - [ ] Settings applied by the driver only: `verifyMode` chose the verify/test node, `reviewLoops` passed
-      as a phase input — no phase skill read `settings.json`.
+      as a phase input, `gatePolicy`/`gateOverrides` resolved each gate's pause-vs-advance — no phase
+      skill read `settings.json`.
+- [ ] Gate autonomy honored the precedence (safety floor → `gateOverrides` → `gatePolicy`): the safety
+      floor still paused/`halt`ed under every policy; only routine gates auto-advanced.
 - [ ] Status dashboard read; the single next phase chosen from the phase graph (or one-off deferred).
 - [ ] Sync check run; any drift (`HEAD` != recorded) surfaced at the sync gate and reconciled, then
       `Last synced commit` updated to `HEAD` (or `none` when git is absent).

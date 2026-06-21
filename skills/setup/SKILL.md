@@ -38,7 +38,7 @@ lives where it can't go stale — harvested by reference in `constitution`, read
 ## Inputs / Outputs (abstract)
 
 - **Input:** the project, an optional **tree-root name** (default `sdlc`), and optional confirmation of
-  the relevant execution prefs (`verifyMode`, `reviewLoops`).
+  the relevant execution prefs (`verifyMode`, `reviewLoops`, `gatePolicy`).
 - **Output:** the bootstrapped tree root — a minimal `index.md` (tree map + ID registry + status
   dashboard) and a `settings.json` (version pin + execution prefs) at `docs/<root>/`, with status
   reflecting greenfield vs brownfield (+ stack), ready for the first phase. No other artifact — no code
@@ -87,10 +87,12 @@ Beside `index.md`, write `docs/<root>/settings.json` using the schema/defaults d
 base skill's *Settings* subsection. Set `version` to `continue`'s `SDLC_SKILLSET_VERSION` (the running
 skillset version — this is the pin downstream drivers check) and `treeRoot` to the location chosen in
 Step 3. Write the full `execution` block with its defaults, and **lightly confirm only the relevant
-prefs in one touch** — `verifyMode` (`test`/`verify`/`both`/`ask`, default `ask`) and `reviewLoops`
-(adversarial `doubt` passes, default `1`). Do not interrogate the operator for every key; the rest are
-defaulted and editable by hand later. Never prompt for `version` — it is taken from the skillset, not
-the operator.
+prefs in one touch** — `verifyMode` (`test`/`verify`/`both`/`ask`, default `ask`), `reviewLoops`
+(adversarial `doubt` passes, default `1`), and `gatePolicy` (`manual`/`milestones`/`auto`, default
+`manual` — how much human review the loop requires at phase gates; this is the human-in-the-loop dial).
+Write `gateOverrides` as `{}`; it is the per-phase escape hatch, edited by hand later, not interrogated.
+Do not interrogate the operator for every key; the rest are defaulted and editable by hand later. Never
+prompt for `version` — it is taken from the skillset, not the operator.
 
 ### 6. Hand off
 
@@ -127,6 +129,7 @@ Either way there is exactly one tree with one entry point.
 - [ ] A single minimal `index.md` created at the chosen location, with `Last synced commit` initialized
       to current `HEAD` (or `none`) — and no phase artifacts.
 - [ ] `settings.json` written beside it: `version` = `SDLC_SKILLSET_VERSION`, `treeRoot` = chosen root,
-      full `execution` block defaulted; only the relevant prefs lightly confirmed, `version` not prompted.
+      full `execution` block defaulted (`gateOverrides` = `{}`); only the relevant prefs lightly confirmed
+      (`verifyMode`, `reviewLoops`, `gatePolicy`), `version` not prompted.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.

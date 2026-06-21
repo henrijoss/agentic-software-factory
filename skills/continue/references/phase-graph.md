@@ -27,24 +27,37 @@ constitution → specify → to-requirements → clarify → design → to-tasks
 
 ## Gate decisions (what each arrow forces)
 
-A driver poses the matching question at each gate — never a generic "looks good?".
+A driver poses the matching question at each gate — never a generic "looks good?". The ★ column marks
+the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column marks the **safety floor**
+(always paused/halted, whatever the policy).
 
-| Gate | Decision forced |
-|---|---|
-| constitution → specify | Are the standing principles right before we commit intent to them? |
-| specify → to-requirements | Is the objective/scope/success correct, and ready to fan out? |
-| to-requirements → clarify | Right use-cases and stakeholders? Which slice first? |
-| clarify → design | Is this requirement unambiguous enough to design against? |
-| design → to-tasks | Is the approach/architecture sound and the risks acceptable? |
-| to-tasks → implement | Are tasks sized, ordered, and the dependency graph correct? |
-| implement → verify/test | Does the slice do what the task claims? Which verification level? |
-| verify → review | Is behavior confirmed and ready for adversarial review? |
-| review → deploy | Findings resolved or consciously accepted as trade-offs? |
-| deploy → maintain | Did it ship cleanly; what is now in operation? (+ pre-ship authorization) |
-| maintain → specify | Which discovered work re-enters the loop, at what priority? |
+| Gate | ★ | ⚠ | Decision forced |
+|---|---|---|---|
+| constitution → specify | ★ | | Are the standing principles right before we commit intent to them? |
+| specify → to-requirements | ★ | | Is the objective/scope/success correct, and ready to fan out? |
+| to-requirements → clarify | | | Right use-cases and stakeholders? Which slice first? |
+| clarify → design | | | Is this requirement unambiguous enough to design against? |
+| design → to-tasks | ★ | | Is the approach/architecture sound and the risks acceptable? |
+| to-tasks → implement | | | Are tasks sized, ordered, and the dependency graph correct? |
+| implement → verify/test | | | Does the slice do what the task claims? Which verification level? |
+| verify → review | | | Is behavior confirmed and ready for adversarial review? |
+| review → deploy | ★ | | Findings resolved or consciously accepted as trade-offs? |
+| deploy → maintain | | ⚠ | Did it ship cleanly; what is now in operation? (+ pre-ship authorization) |
+| maintain → specify | | | Which discovered work re-enters the loop, at what priority? |
 
 `deploy` carries an extra, inverted gate *before* its action (explicit ship authorization) — honor it
 even within a driven session; review approval ≠ ship approval.
+
+### Gate autonomy (`gatePolicy`)
+
+How much human review the loop requires at these gates is set by `settings.execution.gatePolicy`
+(`manual` | `milestones` | `auto`, default `manual`) with optional per-phase `gateOverrides` — consumed
+only by the drivers (the schema lives in the `continue` base skill's *Settings* subsection). At each
+gate the driver resolves *pause vs. advance* by precedence: **safety floor** (⚠ above, plus failed
+gate-validation, a held sync gate, an ambiguous next phase, and a major version mismatch — always
+pause/halt) → `gateOverrides[<phase>]` (`pause`/`auto`) → `gatePolicy` (`manual` pauses all; `auto`
+advances all; `milestones` pauses only the ★ gates). The gate and its **gate-validation run on every
+transition** regardless — `gatePolicy` only relaxes the human prompt at a *routine* gate.
 
 ## Entry modes (composition model)
 
