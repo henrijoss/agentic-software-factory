@@ -1,0 +1,110 @@
+---
+name: setup
+description: One-time project init for the SDLC skillset — choose where the artifact tree is generated and scaffold its single entry point `index.md`. The tree-root location is configurable with a default of `docs/sdlc/`; the operator may pick a different name. Run once at the start of a project, before `constitution`. After setup, every other skill discovers the tree by locating its single `index.md` — no hardcoded path. Idempotent: if a tree already exists, it reports it and never forks a second one. For storage/structure rules it defers to the `continue` base skill.
+---
+
+# Setup (project init)
+
+## Overview
+
+`setup` is the **one-time front door** to a project's artifact tree. It decides *where* the tree is
+generated and creates the single entry point `index.md` there. The location is a **configurable
+default** — `docs/sdlc/` unless the operator picks another name (e.g. `docs/forge/`, `docs/lifecycle/`)
+— so a project can place or rename its tree without editing any skill. After setup, the rest of the
+system **discovers** the tree by its single `index.md` (per the `continue` base skill's resolve-root
+rule), so nothing downstream hardcodes the path.
+
+It owns no phase artifact and defines no structure of its own — the artifact tree, IDs, invariants,
+and the minimal-root template are defined by the `continue` base skill. `setup` just performs the
+explicit, idempotent scaffold, plus a **light orient** glance — greenfield vs brownfield and the stack
+at a glance — recorded only as `index.md` status. It does **not** catalogue the codebase: a persisted
+inventory of existing code is the staleness bomb this skillset exists to prevent. Current-state depth
+lives where it can't go stale — harvested by reference in `constitution`, read live in `design`.
+
+## When to Use
+
+- **Start of a project,** before `constitution`, to fix where the tree lives and scaffold `index.md`.
+- **To place the tree at a non-default location/name** instead of `docs/sdlc/`.
+
+**When NOT to use:**
+
+- A tree already exists — setup is a no-op that reports the existing root (never fork a second tree);
+  just run `continue` / the phase you need.
+- As a phase or a driver — it neither owns an artifact nor sequences the loop.
+- A one-off single-skill task may skip explicit setup; the driver/phase bootstrap fallback creates the
+  default `docs/sdlc/` root on first write (see the `continue` base skill).
+
+## Inputs / Outputs (abstract)
+
+- **Input:** the project, and an optional **tree-root name** (default `sdlc`).
+- **Output:** the bootstrapped tree root — a minimal `index.md` (tree map + ID registry + status
+  dashboard) at `docs/<root>/`, with status reflecting greenfield vs brownfield (+ stack), ready for
+  the first phase. No other artifact — no code inventory.
+
+## Process
+
+### 1. Discover any existing tree first (idempotent)
+
+Resolve the tree root per the `continue` base skill (locate the single SDLC `index.md`). If one
+already exists, **stop and report its location** — do not create or fork a second tree. The
+single-tree invariant holds.
+
+### 2. Orient — greenfield or brownfield (light, read-only)
+
+Glance at the project to set a current-state signal — **detection only, no cataloguing**:
+
+- **Greenfield vs brownfield:** is there existing source beyond scaffolding? Signal from `src/`, a
+  manifest (`package.json` / `pyproject.toml` / `go.mod` / `Cargo.toml` …), and non-trivial git history.
+- **Stack at a glance:** language/framework, primary entry point(s), whether `CLAUDE.md` / `README`
+  exist — only enough to label status and aim the handoff. Stop there; the deep harvest is
+  `constitution`'s job and fine-grained current state is `design`'s (read live, per requirement).
+
+Persist none of this beyond the one-line status in Step 3. Writing a code inventory here violates
+setup's charter and plants a snapshot that immediately goes stale.
+
+### 3. Determine the tree-root location
+
+If no tree exists, choose the root: `docs/<name>/` with **default `sdlc`** → `docs/sdlc/`. If the
+operator supplied or wants a different name, use `docs/<that-name>/`. Confirm the location with the
+operator (a light confirmation — this is not a loop gate, just "generate the tree here?").
+
+### 4. Scaffold the minimal root
+
+Create the single entry point `index.md` at the chosen location using the **minimal-root template**
+defined by the `continue` base skill (tree map placeholder + empty ID registry + status). Set the
+status from Step 2: greenfield → `bootstrapped — no phases run yet`; brownfield →
+`bootstrapped (brownfield: <stack>) — no phases run yet`. Create nothing else — levels materialize
+when their producing phase runs.
+
+### 5. Hand off
+
+Report the root path and that the project is bootstrapped. Hand off to `constitution` (or whatever the
+operator's entry intent is) — when brownfield, note that `constitution` should **harvest** existing
+standing docs and capture existing-system facts as references/constraints. From here on, drivers and
+phases discover this `index.md` automatically.
+
+## Composability (big↔small)
+
+A full project runs `setup` once, then walks the loop. A tiny one-off can skip it and let the
+bootstrap fallback create the default `docs/sdlc/` root on first write. Either way there is exactly
+one tree with one entry point.
+
+## Red Flags
+
+- Creating a second `index.md` when one already exists (forking the tree) instead of reporting it.
+- Hardcoding `docs/sdlc/` as if immutable — it is the **default**, not the only, location.
+- Scaffolding artifacts beyond the minimal `index.md` (phases create their own).
+- Writing a current-state / code-inventory artifact in setup — a staleness bomb; setup owns no
+  artifact, and existing code is read live by `design`, referenced by `constitution`.
+- Turning the orient glance into a deep codebase analysis (that's `constitution` harvest / `design`).
+- Redefining the tree structure here instead of deferring to the `continue` base skill.
+
+## Verification
+
+- [ ] Discovery ran first; an existing tree was reported, not forked.
+- [ ] Orient glance ran read-only; greenfield/brownfield (+ stack) reflected in `index.md` status only.
+- [ ] No code inventory / current-state artifact written.
+- [ ] Tree root chosen as `docs/<root>/` (default `sdlc`); location confirmed with the operator.
+- [ ] A single minimal `index.md` created at the chosen location (and nothing else).
+- [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
+- [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.

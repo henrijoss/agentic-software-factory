@@ -1,0 +1,117 @@
+---
+name: clarify
+description: Deepens one draft Requirement into a ready one — resolves its open questions and turns draft acceptance signals into sharp, testable, unambiguous criteria, so `design` can plan against it without guessing. The human deep-dive on a single requirement; its engine is the `interview` posture. Use when a requirement chosen for the next slice is still ambiguous. Distinct from `to-requirements` (which fans the spec into many drafts) and `design` (the how): clarify makes one requirement ready.
+---
+
+# Clarify
+
+## Overview
+
+`clarify` takes one **draft Requirement** and makes it **ready**: every open question resolved (or
+explicitly deferred), and the draft acceptance signals sharpened into unambiguous, testable criteria.
+It is the deep-dive that ensures the next phase isn't designing against a moving target.
+
+Its **engine is the `interview` posture** — one question at a time, with a guess attached, until the
+intent is pinned. `clarify` doesn't reimplement that; it *invokes* `interview` and adds the
+requirement-specific framing (what "ready" means, sharpening acceptance, the in-place update and
+gate). Note the symmetry: `specify` calls `interview` for the whole Spec; `clarify` calls it for one
+Requirement.
+
+## When to Use
+
+- A Requirement chosen for the next slice still carries open questions or vague acceptance.
+- Before `design`, when the approach can't be chosen because the *what* is still fuzzy.
+- Re-entering to re-clarify when a requirement's intent shifts.
+
+**When NOT to use:**
+
+- Fanning the Spec into requirements — that's `to-requirements`.
+- Deciding the approach/architecture — that's `design`.
+- A requirement that is already unambiguous and testable (go straight to `design`).
+
+## Inputs / Outputs (abstract)
+
+- **Input:** one draft **Requirement** `[REQ-n]` (from `to-requirements`), its **Stakeholders**
+  `[STK-n]`, and the **Constitution** `[CONST]`.
+- **Output:** the same **Requirement** `[REQ-n]`, **updated in place** to *ready* — sharp acceptance
+  criteria, open questions resolved or explicitly deferred. Storage resolves through
+  the `continue` base skill (default: `requirements/REQ-<n>/requirement.md`, in place).
+
+## Process
+
+### 1. Read the draft and its context
+
+Read `[REQ-n]` (the use-case, draft acceptance, open questions), its Stakeholders, and `[CONST]`.
+Clarify *this one* requirement — don't re-open the fan-out (that's `to-requirements`).
+
+### 2. Resolve the unknowns via `interview`
+
+Run the **`interview`** posture on the requirement's open questions and ambiguities: one focused
+question at a time, each with your best guess, until you can predict the user's answers. Watch for
+"want vs. should-want" on acceptance ("make it fast" → a number). Don't reimplement interview's
+mechanics — invoke them.
+
+### 3. Sharpen acceptance into testable criteria
+
+Turn each draft acceptance signal into a criterion `verify`/`test` could check objectively: concrete
+conditions, edge/negative cases the use-case implies, and an explicit out-of-scope line. Vague
+acceptance is the main thing `clarify` exists to kill.
+
+### 4. Resolve or explicitly defer open questions
+
+Every open question ends as **answered** or **deferred with a reason** (and, if deferred, a note on
+whether it blocks design). None left dangling — a dangling question becomes a silent assumption in
+`design`.
+
+### 5. Write the ready Requirement in place
+
+Update `[REQ-n]` via artifact-io — **overwrite in place**, never fork. The use-case stays; acceptance
+becomes ready; the open-questions section shrinks to resolved/deferred.
+
+### 6. Gate → design
+
+Force the readiness decision: *"Is this one requirement unambiguous enough to design against?"* The
+bar: could `design` proceed without guessing, and could `verify`/`test` check acceptance objectively?
+On explicit approval, hand off to `design`.
+
+## Ready Requirement shape
+
+Short form below; the readiness checklist, sharpening technique, and a worked example live in
+`references/clarify-guide.md`.
+
+```markdown
+# REQ-n — [use-case title]   (ready)
+
+**As a** [STK-n] **I want** [capability] **so that** [value].
+**Acceptance:**
+- [ ] [sharp, testable criterion]
+**Out of scope:** [explicit non-goals]
+**Resolved / deferred:** [former open questions + their answer or deferral reason]
+**Stakeholders:** [STK-n, …]
+```
+
+## Composability (big↔small)
+
+A nearly-clear requirement may need one interview question and a tightened criterion. A fuzzy one
+needs several rounds. If clarifying keeps re-opening scope, the issue is upstream — kick back to
+`to-requirements`/`specify` rather than grinding here.
+
+## Red Flags
+
+- Reimplementing `interview` instead of invoking it.
+- Re-fanning the spec / inventing new requirements — that's `to-requirements`.
+- Designing (choosing an approach) inside clarify — that's `design`.
+- Leaving acceptance vague enough that `verify`/`test` can't check it.
+- Dangling open questions that silently become assumptions downstream.
+- No out-of-scope line on the ready requirement.
+- Forking a second requirement file instead of updating in place.
+
+## Verification
+
+- [ ] Worked one requirement; fan-out not re-opened.
+- [ ] Open questions resolved via `interview` (invoked, not reimplemented).
+- [ ] Acceptance sharpened into testable criteria with edge cases and an out-of-scope line.
+- [ ] Every open question ended answered or explicitly deferred (none dangling).
+- [ ] `[REQ-n]` updated in place to ready — no duplicate artifact.
+- [ ] Readiness bar met: `design` could proceed without guessing; `verify` could check acceptance.
+- [ ] The gate decision was posed and explicit approval received before handing to `design`.
