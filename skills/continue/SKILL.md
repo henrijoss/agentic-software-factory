@@ -302,6 +302,23 @@ unreachable → fail and surface). Present the phase's specific gate decision (n
 **Stop** — the operator decides whether to run `continue` again for the next step. (Auto-advancing
 across gates is `orchestrator`'s job, not this skill's.)
 
+**Interactive framing (presentation contract).** When a human is present, frame the output per
+`references/presentation.md`: at phase entry emit a **phase-start banner** (`━━━ PHASE N/11 · <phase> ━━━`
++ the `[REQ-n]`/`[TASK-m]` it operates on) followed once by the **vertical phase map** (✓ done · ▶
+current · pending); at the gate emit a **`── <phase> complete · GATE ──`** block carrying this gate's
+specific decision question. On a **successful ingest** (artifact written, `index.md` updated,
+gate-validation passed) emit a **saved confirmation** — the artifact(s) by `<ID> → <path>` plus
+`index.md`, and a "Safe to clear or close — `index.md` holds the state; resume with /continue" line — so
+the operator knows the tree is persisted and the session is disposable. Only claim "saved" **after**
+gate-validation passes; on failure surface the failure instead. Then **hand the decision to the
+operator** as the **last** thing in the message. Prefer an **interactive selection picker** (the
+harness's question tool — in Claude Code,
+`AskUserQuestion`) so it is unmistakably their turn: Approve / Request changes (with a note for what to
+change) / Stop, or the gate's variant (verify/test → test/verify/both/Skip; deploy → Authorize ship/Hold;
+fan-out → Approve/Re-slice/Edit set). If no picker is available, fall back to the **`── NEXT ──`** text
+footer with the same options. Banners/maps appear once per phase, never mid-phase. The reference holds the
+literal templates, the picker option sets, and the narrow-terminal degradation ladder.
+
 **Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
 the gate — e.g. driven by `skills/orchestrator/loop.sh`), do not pause. After ingest + gate-validation,
 write `.sdlc/loop-control` with exactly one of: `continue` (advance), `halt: <reason>` (a human is
@@ -312,7 +329,9 @@ version mismatch, or a decision the phase would otherwise have to guess; otherwi
 (from `gateOverrides` or `gatePolicy`) writes `halt: gate <phase> — gatePolicy=<policy>`, and a resolved
 **advance** writes `continue`. This is how the human-gate-on-every-transition rule holds without a human
 in the loop — and how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt`
-cases: `references/fresh-context.md`.
+cases: `references/fresh-context.md`. Headless emits the loop-control file and **none** of the
+interactive presentation furniture (banners, maps, gate blocks, `NEXT` footers) — those are
+interactive-only (`references/presentation.md`).
 
 ## Composability (big↔small)
 
@@ -329,6 +348,14 @@ tree levels a job needs ever materialize.
   root by discovery.
 - Forking a duplicate artifact on re-entry instead of updating in place.
 - A "looks good?" gate with nothing to decide.
+- Emitting the interactive presentation furniture (phase-start banner, phase map, saved confirmation,
+  gate block, picker / `NEXT` footer) in headless mode, or burying the hand-off above other content
+  instead of as the message's final block.
+- Claiming "saved / safe to clear" before ingest + gate-validation actually completed, or omitting the
+  saved confirmation entirely so the operator can't tell the tree was written and the session is
+  disposable. Explaining the gate in prose and stopping when an interactive picker was
+  available — the hand-off should be a pick (or its text-footer fallback), not a typed guess
+  (`references/presentation.md`).
 - Skipping gate-validation, letting a stale/broken tree propagate.
 - Skipping the sync check, or treating the equality test as a correctness gate instead of examining the
   `recorded..HEAD` diff to reconcile.

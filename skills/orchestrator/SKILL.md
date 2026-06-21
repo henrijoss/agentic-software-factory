@@ -82,7 +82,11 @@ floor → `gateOverrides[<phase>]` → `gatePolicy`):
 - **Resolved `pause`** (`manual`, a milestone gate under `milestones`, or a `pause` override) → present
   the phase's gate decision (the specific question from the graph, never "looks good?") and **wait for
   explicit approval**. A gate that surfaces nothing to decide is a smell — say so rather than
-  rubber-stamping.
+  rubber-stamping. When interactive, frame it per the presentation contract (`continue`'s
+  `references/presentation.md`) — a `── <phase> complete · GATE ──` block, then hand the decision off as
+  an **interactive picker** (Approve / Request changes / Stop, or the gate's variant), falling back to the
+  `── NEXT ──` text footer when no picker is available; both are the message's last block. Resolved-
+  `advance` gates emit neither.
 - **Resolved `advance`** (`auto`, or a non-milestone gate under `milestones`, or an `auto` override) →
   no prompt; fall through to step 4.
 
@@ -93,7 +97,10 @@ With the default `gatePolicy: manual`, every gate is a `pause` — the orchestra
 
 On a resolved `advance` (or explicit approval at a `pause` gate), update the artifact's status in
 `index.md`, then advance to the **next phase in the graph** and return to step 2 — this auto-advance is
-what distinguishes the orchestrator from `continue` (which stops after one phase). On rejection or a
+what distinguishes the orchestrator from `continue` (which stops after one phase). When interactive,
+emit the **compact saved confirmation** for the just-ingested phase (`✓ saved · <ID>, index.md`), then
+open the next phase with its **start banner + vertical phase map** per the presentation contract
+(`continue`'s `references/presentation.md`). On rejection or a
 surfaced divergence at a `pause` gate, route per the phase (rework re-enters the phase; a stale upstream
 artifact re-enters `specify`/`design` for in-place update) — never auto-advance past an unresolved or
 safety-floor gate.

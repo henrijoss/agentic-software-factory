@@ -17,8 +17,9 @@ constitution → specify → to-requirements → clarify → design → to-tasks
   (`specify`/`clarify` call `interview`; `design`/`implement`/`review` call `doubt`; `implement`
   follows `incremental`). A driver never schedules them — it only sequences phase/transition skills.
 - **`verify`/`test` is one node with a choice:** the operator picks TDD (`test`), run-and-observe
-  (`verify`), or both per the task. The driver presents the choice; the `test`/`verify` skills define
-  which applies.
+  (`verify`), or both per the task — or may **Skip** verification entirely, advancing straight to
+  `review` with the slice recorded **unverified** (a deliberate, logged choice). The driver presents the
+  choice; the `test`/`verify` skills define which applies.
 - **Transition skills (`to-requirements`, `to-tasks`) fan out** and pause for user feedback as part of
   their own gate — a driver just holds that gate like any other.
 - **At each node the driver assembles inputs before and ingests the result after.** Phase/transition
@@ -39,7 +40,7 @@ the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column 
 | clarify → design | | | Is this requirement unambiguous enough to design against? |
 | design → to-tasks | ★ | | Is the approach/architecture sound and the risks acceptable? |
 | to-tasks → implement | | | Are tasks sized, ordered, and the dependency graph correct? |
-| implement → verify/test | | | Does the slice do what the task claims? Which verification level? |
+| implement → verify/test | | | Does the slice do what the task claims? Which verification level (or Skip → review, unverified)? |
 | verify → review | | | Is behavior confirmed and ready for adversarial review? |
 | review → deploy | ★ | | Findings resolved or consciously accepted as trade-offs? |
 | deploy → maintain | | ⚠ | Did it ship cleanly; what is now in operation? (+ pre-ship authorization) |
@@ -47,6 +48,10 @@ the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column 
 
 `deploy` carries an extra, inverted gate *before* its action (explicit ship authorization) — honor it
 even within a driven session; review approval ≠ ship approval.
+
+These decision questions are what the interactive call-to-action surfaces — editing a question here
+changes user-facing gate copy (the drivers render it per `references/presentation.md`). This table stays
+the single source of the questions; no display format lives here.
 
 ### Gate autonomy (`gatePolicy`)
 
