@@ -90,7 +90,9 @@ skillset version — this is the pin downstream drivers check) and `treeRoot` to
 Step 3. Write the full `execution` block with its defaults, and **lightly confirm only the relevant
 prefs in one touch** — `verifyMode` (`test`/`verify`/`both`/`ask`, default `ask`), `reviewLoops`
 (adversarial `doubt` passes, default `1`), and `gatePolicy` (`manual`/`milestones`/`auto`, default
-`manual` — how much human review the loop requires at phase gates; this is the human-in-the-loop dial).
+`manual` — how much human review the loop requires at phase gates; this is the human-in-the-loop dial),
+and `traversal` (`depth-first`/`requirements-first`, default `depth-first` — whether to run each slice
+through to `deploy` before the next requirement, or do all requirements-engineering first then implement).
 Write `gateOverrides` as `{}`; it is the per-phase escape hatch, edited by hand later, not interrogated.
 Do not interrogate the operator for every key; the rest are defaulted and editable by hand later. Never
 prompt for `version` — it is taken from the skillset, not the operator.
@@ -154,7 +156,7 @@ Either way there is exactly one tree with one entry point.
       to current `HEAD` (or `none`) — and no phase artifacts.
 - [ ] `settings.json` written beside it: `version` = `SDLC_SKILLSET_VERSION`, `treeRoot` = chosen root,
       full `execution` block defaulted (`gateOverrides` = `{}`); only the relevant prefs lightly confirmed
-      (`verifyMode`, `reviewLoops`, `gatePolicy`), `version` not prompted.
+      (`verifyMode`, `reviewLoops`, `gatePolicy`, `traversal`), `version` not prompted.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.
 - [ ] Next-step hand-off presented the three paths (step / loop / manual) as the last block — picker or

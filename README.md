@@ -8,35 +8,44 @@ every phase of the software lifecycle and chain together through **human gates**
 
 - **Composable, big↔small.** Assemble only the skills (and artifact-tree levels) a job needs. A typo
   runs `implement` alone; a product runs the whole loop. No phase is mandatory.
-- **Iterative, not waterfall.** The unit of iteration is one **vertical slice / use-case**. The loop
-  is a cycle closed by `maintain → specify`.
+- **Iterative, not waterfall.** The unit of iteration is one **vertical slice / use-case**; the loop is
+  a cycle closed by `maintain → specify`. By default each slice runs through to `deploy` before the
+  next (`traversal: depth-first`); `requirements-first` instead does the requirements-engineering for
+  every requirement up front, then implements in priority order.
 - **Anti-staleness by in-place update.** Re-entering a phase overwrites *that phase's* artifact — one
-  source of truth, so spec and code cannot silently diverge. (The phase re-emits the artifact; the
-  driver's ingest does the in-place overwrite.)
-- **Drift sync against git.** `index.md` records the last commit the system reconciled against; at every
-  `continue` start the driver compares it to `HEAD` and, on external commits made between
-  sessions, holds a **sync gate** to reconcile open work (some tasks may already be resolved). Closes
-  the blind spot in-place update alone can't see.
-- **A human gate on every transition — as much or as little as you want.** Each gate must surface a
-  real decision, never "looks good?". How many of them stop for a human is configurable via
-  `gatePolicy` (`manual` = pause every gate, default; `milestones` = pause only the big ones; `auto` =
-  unattended) with per-phase overrides — but gate-validation runs at every transition and the safety
-  gates (`deploy`/irreversible, sync drift, failed validation) always stop, whatever the policy.
-- **Fresh context per step.** Each step resumes from `index.md` and ends by writing its result back, so
-  the conversation is disposable. A step is one phase — except in `implement`, where each step is a
-  **single task**, so every task gets fresh context. To run unattended, `skills/continue/loop.sh` (run
-  once from a terminal) launches every step as a brand-new `claude -p "/continue"` process — context is
-  zeroed each step, `index.md` (plus the SessionSummary within a slice) is the only memory carried
-  across. There is no in-session multi-step driver: the agent cannot wipe its own transcript, so the
-  loop lives in the script. Headless gates that need a human still stop the loop (via
-  `.sdlc/loop-control`). See [`fresh-context.md`](skills/continue/references/fresh-context.md).
-- **Base/init skills + a thin driver, pure standalone skills.** Only `setup` and the `continue` base
-  skill (the sole driver — next step, then stop) know the tree/IDs/storage/chaining. Every other skill
-  is a **pure transform**: it takes inputs the driver provides and **emits a result**; the driver
-  assembles inputs before and ingests the result after. So every skill is directly invocable on its own
-  — standalone it just emits its result and creates no tree.
-- **Lean.** Each skill is a small operational core (depth in its `references/`); a driver loads
-  **one phase at a time** to stay within the model's reliable instruction budget.
+  source of truth, so spec and code cannot silently diverge. A **drift sync** against git
+  (`index.md` records the last reconciled commit) catches code committed outside the system between
+  sessions.
+- **A human gate on every transition — as much or as little as you want.** Each gate surfaces a real
+  decision, never "looks good?". How many stop for a human is set by `gatePolicy` (`manual` =
+  every gate, default; `milestones` = the big ones; `auto` = unattended); the safety gates
+  (deploy/irreversible, sync drift, failed validation) always stop regardless.
+- **Fresh context per step, pure standalone skills.** Only `setup` and the `continue` base skill (the
+  sole driver) know the tree/IDs/storage/chaining; every other skill is a **pure transform** that takes
+  provided inputs and emits a result, so each is directly invocable on its own. The driver runs one
+  step from `index.md` and stops — so the conversation is disposable and context never grows across
+  steps (see [Getting started](#getting-started)).
+
+## Getting started
+
+Install the skills where Claude Code finds them (copy `skills/` into `~/.claude/skills/`, or symlink
+this repo), then from your project root:
+
+1. **`setup`** — one-time. Scaffolds the artifact tree root: a single `index.md` at `docs/<root>/`
+   (default `docs/sdlc/`) plus its `settings.json`. Discovered automatically thereafter.
+2. **`constitution`** — set the standing principles and constraints every later phase reads.
+3. **`continue`** — run the next single step (one phase, or one `implement` task) and stop at its gate.
+   Two ways to drive it:
+   - **Manual** — invoke `/continue` yourself, review at each gate, invoke it again for the next step.
+     You stay in control step by step.
+   - **Unattended (Ralph loop)** — run [`skills/continue/loop.sh`](skills/continue/loop.sh) once from a
+     terminal. It relaunches `/continue` as a **brand-new process per step**, so context is zeroed each
+     time; `index.md` is the only memory carried across. It honors `gatePolicy`, and the safety gates
+     still halt the loop for a human (via `.sdlc/loop-control`). Step cap = `execution.maxSteps`
+     (override with `MAX_STEPS=…`).
+
+Every skill is also directly invocable on its own for one-off use. See
+[`continue`](skills/continue) for the structure, settings schema, and chaining rules.
 
 ## The loop
 
@@ -128,10 +137,10 @@ fails on any dangling, duplicate, orphan, or unreachable ID.
 
 Beside it, **`settings.json`** pins the skillset `version` the tree was created with (the driver runs a
 semver-aware compatibility check at session start — major mismatch halts) and holds tweakable
-`execution` prefs (`maxSteps`, `verifyMode`, `reviewLoops`, `gatePolicy`, `gateOverrides`). It's a system file written by `setup`/the
-driver bootstrap and read only by `setup`/`continue`; phases receive any
-settings-derived value as a provided input, never the file. See the
-[`continue`](skills/continue) base skill for the schema and the `SDLC_SKILLSET_VERSION` constant.
+`execution` prefs. It's a system file written by `setup`/the driver bootstrap and read only by
+`setup`/`continue`; phases receive any settings-derived value as a provided input, never the file. See
+the [`continue`](skills/continue) base skill for the full settings schema and the
+`SDLC_SKILLSET_VERSION` constant.
 
 ## Storage
 
@@ -145,8 +154,3 @@ in git is what gives atomic spec+code commits, branch-per-slice state, and the i
 anti-staleness. **GitHub issues** are an optional *edge integration*, not a backend — `maintain` can
 ingest issues as a live-signal source, and Requirements/Tasks can be mirrored one-way to issues for
 visibility (a derived view; the files stay source of truth).
-
-## Internal docs
-
-- [`WORKFLOW.md`](WORKFLOW.md) — internal architecture spec and design rationale (the canonical map
-  behind these skills). Not part of the shipped skillset.

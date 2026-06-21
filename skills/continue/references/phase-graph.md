@@ -49,6 +49,14 @@ the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column 
 `deploy` carries an extra, inverted gate *before* its action (explicit ship authorization) — honor it
 even within a driven session; review approval ≠ ship approval.
 
+The **`to-tasks → implement`** gate has two advance targets, chosen by `settings.execution.traversal`
+(`depth-first` default | `requirements-first`) plus the interactive **Clarify next requirement** picker
+option: advance to `implement` for this slice (`depth-first`), or **defer implement** and re-enter
+`clarify` on the next **draft** requirement (`requirements-first`). Deferring marks the requirement
+`tasks ready · deferred`; once every requirement is tasked (no draft left), the driver drains the
+deferred slices through `implement` in `to-requirements` priority order. The gate itself, its question,
+and its validation are unchanged — `traversal` only picks where an *advancing* gate goes.
+
 These decision questions are what the interactive call-to-action surfaces — editing a question here
 changes user-facing gate copy (the driver renders it per `references/presentation.md`). This table stays
 the single source of the questions; no display format lives here.
@@ -63,6 +71,10 @@ gate-validation, a held sync gate, an ambiguous next phase, and a major version 
 pause/halt) → `gateOverrides[<phase>]` (`pause`/`auto`) → `gatePolicy` (`manual` pauses all; `auto`
 advances all; `milestones` pauses only the ★ gates). The gate and its **gate-validation run on every
 transition** regardless — `gatePolicy` only relaxes the human prompt at a *routine* gate.
+
+`gatePolicy` (pause vs. advance) and `execution.traversal` (the advance *target* at the
+`to-tasks → implement` gate) are orthogonal: a non-HITL gate under the default `depth-first` always
+progresses to `implement`; `requirements-first` is the opt-in that defers it to `clarify` the next draft.
 
 ## Entry modes (composition model)
 

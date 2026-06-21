@@ -128,7 +128,8 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
     "verifyMode": "ask",
     "reviewLoops": 1,
     "gatePolicy": "manual",
-    "gateOverrides": {}
+    "gateOverrides": {},
+    "traversal": "depth-first"
   }
 }
 ```
@@ -149,6 +150,13 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
 - `execution.gateOverrides` — an object mapping a **just-completed phase name** → `pause | auto`,
   overriding `gatePolicy` for that one gate (e.g. `{"design": "pause", "review": "pause"}`). Default
   `{}`. (`verify`/`test` share the key `verify`.)
+- `execution.traversal` — `depth-first | requirements-first` (default `depth-first`); the order the
+  loop walks requirements through the graph. `depth-first` runs one slice all the way to `deploy`
+  before touching the next requirement (the original behavior). `requirements-first` does the
+  requirements-engineering (`clarify` → `design` → `to-tasks`) for **every** draft requirement before
+  implementing any, then drains `implement` in `to-requirements` priority order. It governs only the
+  advance *target* at the `to-tasks → implement` gate (see *Gate autonomy* and Step 4) — it never adds,
+  removes, or relaxes a gate.
 
 **Gate autonomy (how `gatePolicy`/`gateOverrides` are applied).** This is a **system-skill concern** —
 only the driver consults it; phase skills never see it (like every other setting). At each gate the
@@ -168,6 +176,14 @@ This resolution only applies **headless** (under the `loop.sh` loop): a resolved
 presents the gate and stops, regardless of `gatePolicy` (the operator is the loop). Either way the gate
 and its **gate-validation still run on every transition**; `gatePolicy` only relaxes the human prompt at
 a *routine* gate in the headless loop.
+
+**`gatePolicy` and `traversal` are orthogonal.** `gatePolicy` resolves *pause vs. advance*; `traversal`
+(`execution.traversal`) only chooses, **once a gate has resolved to advance**, the advance *target* —
+and only at the `to-tasks → implement` gate. `depth-first` advances to `implement`; `requirements-first`,
+when a draft requirement still remains, instead marks the just-tasked requirement deferred and re-enters
+`clarify` on the next draft (Step 4). A non-HITL (auto-advancing) `to-tasks` gate therefore always
+progresses straight to `implement` under the default `depth-first`; deferral is the opt-in, whether by
+the interactive picker or by setting `requirements-first`.
 
 **Forward-compatible:** unknown keys are ignored and any missing key falls back to the default above, so
 new settings can be added without breaking older trees. `setup` writes the full file with defaults and
@@ -298,6 +314,25 @@ the user rather than guessing (see entry modes in `references/phase-graph.md`). 
 node**, use `settings.execution.verifyMode` to pick `test` / `verify` / both without asking — unless it
 is `ask` (prompt as usual).
 
+**Which requirement is next (traversal).** With several `[REQ-n]` at different phases, pick the
+requirement to act on by walking them in **`to-requirements` priority order** through these passes (the
+first pass that matches wins):
+
+1. **A slice with `implement` already in progress** (any `[REQ-n.TASK-m]` is `in-progress`) → finish
+   that slice's `implement`. Never abandon a started slice mid-implement.
+2. **A requirement whose tasks are ready and *not* deferred** (status `tasks ready`) → `implement` it.
+   This is `depth-first`: a just-tasked, approved requirement implements before the next is clarified.
+3. **Else a requirement still in prep** (draft → `clarify`; clarified-not-designed → `design`;
+   designed-not-tasked → `to-tasks`) → run its next prep phase. This is where a **deferred** requirement
+   steps aside so the next draft gets clarified.
+4. **Else a requirement deferred at its `to-tasks` gate** (status `tasks ready · deferred`) → `implement`
+   it. The `requirements-first` tail: all prep done, drain implementation in priority order.
+
+The `tasks ready · deferred` marker (set at the `to-tasks → implement` gate — see Step 6) is what lets
+the *same* tree state resolve to either `implement` now (`depth-first`) or `clarify` next
+(`requirements-first`); the choice is persisted in `index.md`, not re-derived. Per-gate choices win
+*within* a pass — if `REQ-01` is deferred but `REQ-02` was approved, pass 2 implements `REQ-02`.
+
 **Inside `implement`, a step is one task.** When the chosen slice `[REQ-n]` is in the `implement` phase,
 the next step is **one task**, not the whole phase: pick the lowest-ordered `[REQ-n.TASK-m]` that is not
 `done` and whose dependency-graph prerequisites (from `to-tasks`) are all `done`, and run `implement` on
@@ -321,7 +356,10 @@ needed), and **emits its result** — an in-context result block (phase skills) 
 **Ingest** per `references/handoff.md`: capture the emitted result → resolve/assign the stable ID →
 write to the tree path (artifact-io), updating **in place** on re-entry (never fork) → register/update
 `index.md` → clear `.sdlc/scratch/`. For an `implement` step, ingest also updates the just-finished
-**task's status** in `index.md` (`done`, or `blocked`) alongside the SessionSummary it wrote. Run
+**task's status** in `index.md` (`done`, or `blocked`) alongside the SessionSummary it wrote. For a
+`to-tasks` step, the requirement's status becomes `tasks ready`, or `tasks ready · deferred` when the
+gate resolves to defer implement (interactive **Clarify next requirement**, or headless
+`requirements-first` while a draft requirement still remains). Run
 **gate-validation** (dangling / duplicate / orphan / unreachable → fail and surface). Present the
 step's specific gate decision (never "looks good?"). **Stop** — the session ends here. The operator
 runs `continue` again for the next step, or the `loop.sh` loop relaunches it in a fresh session.
@@ -346,9 +384,13 @@ operator** as the **last** thing in the message. Prefer an **interactive selecti
 harness's question tool — in Claude Code,
 `AskUserQuestion`) so it is unmistakably their turn: Approve / Request changes (with a note for what to
 change) / Stop, or the gate's variant (verify/test → test/verify/both/Skip; deploy → Authorize ship/Hold;
-fan-out → Approve/Re-slice/Edit set). If no picker is available, fall back to the **`── NEXT ──`** text
-footer with the same options. Banners/maps appear once per phase, never mid-phase. The reference holds the
-literal templates, the picker option sets, and the narrow-terminal degradation ladder.
+fan-out → Approve/Re-slice/Edit set). At the **`to-tasks → implement` gate**, when a draft
+(un-prepared) requirement still remains, the fan-out picker also offers **Clarify next requirement** —
+accept this task set but defer `implement` and re-enter `clarify` on the next draft requirement (the
+affirmative option under `requirements-first`, otherwise after Approve). If no picker is available, fall
+back to the **`── NEXT ──`** text footer with the same options. Banners/maps appear once per phase, never
+mid-phase. The reference holds the literal templates, the picker option sets, and the narrow-terminal
+degradation ladder.
 
 **Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
 the gate — e.g. driven by `skills/continue/loop.sh`), do not pause. After ingest + gate-validation,
@@ -360,7 +402,12 @@ version mismatch, or a decision the phase would otherwise have to guess; otherwi
 (from `gateOverrides` or `gatePolicy`) writes `halt: gate <phase> — gatePolicy=<policy>`, and a resolved
 **advance** writes `continue`. A finished `implement` task with **more tasks remaining** is not a gate —
 write `continue` unconditionally (only the safety floor can override); the next fresh session picks the
-next task. This is how the human-gate-on-every-transition rule holds without a human in the loop — and
+next task. At a `to-tasks → implement` gate that resolves to **advance**, `execution.traversal` picks the
+target: `depth-first` writes `continue` (the next session implements this slice); `requirements-first`
+marks the requirement `tasks ready · deferred` and also writes `continue` — the next session, finding no
+non-deferred ready slice, clarifies the next draft requirement (Step 4), and once no draft remains drains
+`implement` in priority order. Either way it is a plain `continue`; the deferral lives in the persisted
+status, not the loop-control verb. This is how the human-gate-on-every-transition rule holds without a human in the loop — and
 how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt` cases:
 `references/fresh-context.md`. Headless emits the loop-control file and **none** of the interactive
 presentation furniture (banners, maps, gate blocks, `NEXT` footers) — those are interactive-only
@@ -403,6 +450,10 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
   ambiguous phase, major version mismatch) always stops, policy notwithstanding.
 - Treating `gatePolicy` as a license to **skip a gate or its gate-validation** — it only relaxes the
   *human prompt* at a routine gate; the gate and its validation still run on every transition.
+- Deferring `implement` to clarify the next requirement under `depth-first` (deferral is opt-in:
+  the interactive **Clarify next requirement** pick, or `traversal: requirements-first`), or abandoning a
+  slice with `implement` **in progress** to chase requirements-first — an in-progress slice finishes
+  first (Step 4, pass 1).
 - Carrying one step's working-context into the next instead of resuming cold from `index.md` — the
   ever-growing-session failure mode at step granularity.
 - Running a phase without the version-compat check, or auto-advancing past a **major** version mismatch
@@ -423,6 +474,10 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
       floor still paused/`halt`ed under every policy; only routine gates auto-advanced.
 - [ ] Status dashboard read; the single next step chosen from the phase graph — one phase, or, inside
       `implement`, the next non-`done` task whose dependencies are met (or one-off deferred).
+- [ ] `traversal` honored at the `to-tasks → implement` gate: `depth-first` advanced to `implement`;
+      `requirements-first` (or an interactive **Clarify next requirement** pick) marked the requirement
+      `tasks ready · deferred` and clarified the next draft, draining deferred slices in priority order
+      only once no prep remained — and a slice already mid-`implement` finished first.
 - [ ] Sync check run; any drift (`HEAD` != recorded) surfaced at the sync gate and reconciled, then
       `Last synced commit` updated to `HEAD` (or `none` when git is absent).
 - [ ] Phase inputs **assembled** from the tree and passed as content; the phase emitted a result

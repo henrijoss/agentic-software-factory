@@ -136,7 +136,8 @@ taking an option slot.
 | Routine pause gate | the phase's specific decision | **Approve** (continue to the next phase) · **Request changes** (note what to change; re-runs the phase in place) · **Stop here** (pause the loop) |
 | verify/test (`verifyMode: ask`) | "Which verification level?" | **test** (TDD) · **verify** (run-and-observe) · **both** · **Skip** (proceed without verifying — slice recorded **unverified**) — *not-ready feedback via the note* |
 | deploy ship authorization (⚠ safety floor) | the ship go/no-go | **Authorize ship** (perform the deploy now — irreversible) · **Hold** (do not ship; back to review / feedback) |
-| to-requirements / to-tasks fan-out | "Right set? Which slice first?" | **Approve** (accept the set; start with the proposed slice) · **Re-slice** (different first slice / priority) · **Edit set** (add/drop/merge; re-runs the transition) — *other feedback via the note* |
+| to-requirements fan-out | "Right set? Which slice first?" | **Approve** (accept the set; start with the proposed slice) · **Re-slice** (different first slice / priority) · **Edit set** (add/drop/merge; re-runs the transition) — *other feedback via the note* |
+| to-tasks fan-out (→ implement) | "Are tasks sized, ordered, and the dependency graph correct?" | **Approve** (accept the set; start implementing) · **Clarify next requirement** (accept tasks but defer implement; re-enter `clarify` on the next draft requirement — *shown only when a draft requirement remains*) · **Re-slice** (different task slicing / order) · **Edit set** (add/drop/merge tasks; re-runs to-tasks) — *other feedback via the note* |
 
 - **verify/test `Skip`** advances `implement → review` **without** verification; the driver records the
   slice as **unverified** in the status dashboard / session summary — a deliberate, logged choice, never
@@ -144,6 +145,12 @@ taking an option slot.
 - **deploy** restates target, version, ship command, and rollback in the element-3 block above the picker
   (matching the "Authorization gate" wording in `skills/deploy/references/deploy-guide.md`); `Authorize
   ship` is the distinct affirmative, never inferred from a prior review approval.
+- **to-tasks `Clarify next requirement`** advances to `clarify` on the next **draft** requirement instead
+  of `implement`, marking this requirement `tasks ready · deferred` (the driver implements deferred slices
+  in priority order once no draft remains — see `SKILL.md` Step 4). It appears **only when a draft
+  requirement remains**; with none left, the gate shows just Approve / Re-slice / Edit set. Under
+  `settings.execution.traversal: requirements-first` it is the **first/affirmative** option (Approve
+  follows it); under the default `depth-first`, `Approve` stays first.
 
 **`── NEXT ──` text footer (fallback form).** Same options as the picker, as a final block; nothing
 follows it.
@@ -176,7 +183,7 @@ About to ship saved-search alerts to PROD as v1.4.0
 → Hold           — do not ship; back to review / feedback
 ```
 
-to-requirements / to-tasks fan-out:
+to-requirements fan-out:
 ```
 ─── NEXT · review the fan-out ─────────────────────
 Fanned out: 4 requirements (REQ-01…REQ-04), 3 stakeholders.
@@ -185,6 +192,19 @@ First slice proposed: REQ-02 · saved-search alerts.
 → Approve   — accept the set; start with REQ-02 → clarify
 → Re-slice  — different first slice / different priority
 → Edit set  — add / drop / merge requirements; I re-run to-requirements
+```
+
+to-tasks fan-out (→ implement) — the `Clarify next requirement` line shows only when a draft requirement
+remains:
+```
+─── NEXT · review the tasks ───────────────────────
+REQ-02 · saved-search alerts: 5 tasks (TASK-01…TASK-05), dep graph ready.
+Next draft requirement: REQ-03 · digest scheduling.
+
+→ Approve                  — accept the tasks; start implementing TASK-01
+→ Clarify next requirement — defer implement; clarify the next draft REQ (REQ-03)
+→ Re-slice                 — different task slicing / order
+→ Edit set                 — add / drop / merge tasks; I re-run to-tasks
 ```
 
 **Hand-off invariants (picker and footer alike):**
