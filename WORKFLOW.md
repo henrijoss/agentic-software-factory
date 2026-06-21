@@ -55,6 +55,16 @@ fit together.
    instructions before compliance degrades. Each `SKILL.md` is a thin operational core under that
    ceiling; depth (rationale, examples, tables) lives in `references/` loaded on demand. The drivers
    load one phase skill at a time.
+8. **Fresh context per step.** A step is self-contained: it resumes from `index.md` and ends by writing
+   its result back, so the conversation is disposable and `index.md` is the only memory carried across
+   steps. This lifts the `implement` session-loop's fresh-context discipline (`skills/implement/
+   references/session-loop.md`) to the driver/step level — the same defense against the ever-growing
+   session (stale detail, hardened assumptions, degraded compliance), now between phases. Loading one
+   skill at a time (principle 7) bounds the *instructions*; this bounds the *transcript*. The only true
+   reset is a fresh process per step: `skills/orchestrator/loop.sh` runs each step as a new
+   `claude -p "/continue"`. A headless step records its gate in `.sdlc/loop-control`
+   (`continue`/`halt: <reason>`/`done`) so `halt` gates still stop for a human — principle 4 holds
+   without one in the loop. Defined in the `continue` base skill (`references/fresh-context.md`).
 
 ## Three skill categories
 

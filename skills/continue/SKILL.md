@@ -20,7 +20,14 @@ contract). This skill does everything system-shaped around it: it **assembles** 
 the tree before, and **ingests** the emitted result into the tree after — `continue` is the only actor
 that reads/writes the tree, `index.md`, and IDs. Depth (the result contract, ingest and input-assembly
 in `references/handoff.md`; the full storage-binding table and optional GitHub edge integrations; the
-entry modes and worked example) lives in `references/` and is loaded on demand.
+entry modes and worked example; the **fresh-context step loop** in `references/fresh-context.md`) lives
+in `references/` and is loaded on demand.
+
+Each step is **self-contained**: it resumes from `index.md` and ends by writing its result back to the
+tree. The conversation is disposable — once a step is ingested, `index.md` holds everything the next
+step needs, so the next step can (and for long unattended runs, should) start from a **completely
+fresh context**. `references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and the
+non-interactive loop-control contract below.
 
 ## When to Use
 
@@ -200,6 +207,15 @@ unreachable → fail and surface). Present the phase's specific gate decision (n
 **Stop** — the operator decides whether to run `continue` again for the next step. (Auto-advancing
 across gates is `orchestrator`'s job, not this skill's.)
 
+**Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
+the gate — e.g. driven by `skills/orchestrator/loop.sh`), do not pause. After ingest + gate-validation,
+write `.sdlc/loop-control` with exactly one of: `continue` (routine advance), `halt: <reason>` (a human
+is required), or `done` (the slice/loop is complete). **`halt` is mandatory — never `continue` — for:**
+an ambiguous next phase; a held **sync gate** (external drift); `deploy` or any outward/irreversible
+authorization; failed gate-validation; or a decision the phase would otherwise have to guess. This is
+how the human-gate-on-every-transition rule holds without a human in the loop. Full contract and the
+`halt` cases: `references/fresh-context.md`.
+
 ## Composability (big↔small)
 
 A typo just runs `implement`. A single requirement enters at `design`. A whole product walks the loop
@@ -219,6 +235,11 @@ tree levels a job needs ever materialize.
 - Skipping the sync check, or treating the equality test as a correctness gate instead of examining the
   `recorded..HEAD` diff to reconcile.
 - Blocking a phase when there is no git repo/`HEAD` — the sync check degrades to no-drift, never blocks.
+- In non-interactive mode, writing `continue` to `.sdlc/loop-control` for a `halt`-worthy gate (sync
+  drift, `deploy`/irreversible, ambiguous next phase, failed validation) — that auto-advances past a
+  decision a human owes. When in doubt, `halt`.
+- Carrying one step's working-context into the next instead of resuming cold from `index.md` — the
+  ever-growing-session failure mode at step granularity.
 
 ## Verification
 
@@ -232,5 +253,9 @@ tree levels a job needs ever materialize.
 - [ ] Exactly **one** phase run, then stopped at its gate — no auto-advance.
 - [ ] Result **ingested**: ID resolved, written to the tree, `index.md` registered/updated,
       `.sdlc/scratch/` cleared.
-- [ ] Gate-validation run; the phase's real decision posed; `index.md` status updated.
+- [ ] Gate-validation run; the phase's real decision posed (interactive), or `.sdlc/loop-control`
+      written with `continue`/`halt: <reason>`/`done` (non-interactive) — `halt` for any gate owing a
+      human decision.
 - [ ] Re-entry updated artifacts in place — no duplicate fork.
+- [ ] The step resumed from `index.md` and ended by writing its result back — self-contained, so the
+      next step can start from a fresh context.

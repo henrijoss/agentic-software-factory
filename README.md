@@ -18,6 +18,11 @@ every phase of the software lifecycle and chain together through **human gates**
   sessions, holds a **sync gate** to reconcile open work (some tasks may already be resolved). Closes
   the blind spot in-place update alone can't see.
 - **A human gate on every transition.** Each gate must surface a real decision, never "looks good?".
+- **Fresh context per step.** Each step resumes from `index.md` and ends by writing its result back, so
+  the conversation is disposable. For long unattended runs, `skills/orchestrator/loop.sh` runs every
+  step as a brand-new `claude -p "/continue"` process — context is zeroed each step, `index.md` is the
+  only memory carried across. Headless gates that need a human still stop the loop (via
+  `.sdlc/loop-control`). See [`fresh-context.md`](skills/continue/references/fresh-context.md).
 - **Base/init skills + thin drivers, pure standalone skills.** Only `setup`, the `continue` base skill
   (default driver — next step, then stop), and `orchestrator` (opt-in full-loop) know the tree/IDs/
   storage/chaining. Every other skill is a **pure transform**: it takes inputs the driver provides and

@@ -88,6 +88,19 @@ session when the user has no further slice to drive.
 
 See `references/orchestration-guide.md` for auto-advance semantics and a worked example.
 
+## Fresh-context variant (long unattended runs)
+
+Auto-advancing inside **one** session means the transcript grows phase after phase — the
+ever-growing-session failure mode the `implement` session-loop warns about, now at the phase level. For
+a long unattended run where you want context **zeroed each step**, use the fresh-process loop instead:
+`skills/orchestrator/loop.sh` runs each step as a brand-new `claude -p "/continue"` process that
+resumes cold from `index.md`, runs one phase, writes its result, and exits. The headless `/continue`
+records its gate decision in `.sdlc/loop-control` (`continue` / `halt: <reason>` / `done`), so the
+`halt` gates — sync drift, `deploy`/irreversible authorization, ambiguous or failed gates — still stop
+for a human. Same phase graph, same gates; the only trade is in-session auto-advance (keeps the
+transcript) vs. a cold process per step (keeps context flat). See the `continue` base skill's
+`references/fresh-context.md`.
+
 ## Composability (big↔small)
 
 A typo never needs the orchestrator — invoke `implement` alone. A single step is `continue`. A single
@@ -104,6 +117,8 @@ actually needs; no phase or tree level is mandatory.
 - Skipping gate-validation between phases (lets a stale/broken tree propagate).
 - Forgetting bootstrap — running a phase with no `index.md` entry point.
 - Bypassing `deploy`'s distinct ship authorization because review was approved.
+- Reaching for a long single-session run to keep context "for continuity" — that's the
+  ever-growing-session failure mode; for long unattended runs use the fresh-process loop (`loop.sh`).
 
 ## Verification
 
@@ -116,3 +131,5 @@ actually needs; no phase or tree level is mandatory.
       approval before auto-advancing; rejections routed, not skipped.
 - [ ] `index.md` status updated as each phase completed.
 - [ ] Loop closure handled (`maintain → specify`) for the next slice; in-place updates on re-entry.
+- [ ] For long unattended runs, the fresh-process loop (`loop.sh`) chosen over one growing session;
+      `halt` gates still stopped for a human via `.sdlc/loop-control`.

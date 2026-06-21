@@ -17,6 +17,11 @@ The fresh-context loop is the middle path: each session starts clean but reads a
 ever-longer conversation. This is the same discipline as the GitHub-issues backend's Session-Context
 issue — the handoff is the durable memory; the session is disposable.
 
+This per-**task** loop is the *inner* instance of the driver-level per-**step** loop the `continue`
+base skill defines in `references/fresh-context.md` (where `index.md` is the cross-step handoff and
+`skills/orchestrator/loop.sh` gives a fresh process per step). A single `implement` step may run
+several task-sessions before the step writes its gate decision and the outer loop advances.
+
 ## Context-loading discipline (Step 1)
 
 Load the *right* slice, not everything:
