@@ -11,8 +11,9 @@ fit together.
 > (`continue`, `orchestrator`) are authored against this spec (lean `SKILL.md` + `references/` each);
 > the mined reference drafts have been consumed and deleted. This document remains the canonical map.
 > Shared structure/storage knowledge lives in the **`continue` base skill** (see
-> `skills/continue/SKILL.md` and its `references/`); the tree-root **bootstrap** open question is
-> resolved there (a driver owns it; phase skills fall back).
+> `skills/continue/SKILL.md` and its `references/`); the tree-root **bootstrap** is owned solely by
+> `setup` and the two drivers — non-system skills are pure transforms that emit a result and create no
+> tree (the result contract + assemble/ingest seam live in `references/handoff.md`).
 
 ## Design principles (locked)
 
@@ -25,15 +26,28 @@ fit together.
 3. **Anti-staleness by in-place update.** Re-entering any phase **updates that phase's artifact in
    place** — single source of truth. Spec and code cannot silently diverge; re-entry is the
    reconciliation mechanism. (The field's top documented failure mode is a stale spec that an agent
-   executes confidently; this rule plus gate-validation is the defense.)
+   executes confidently; this rule plus gate-validation is the defense.) Mechanically the phase is a
+   pure transform that *re-emits* the artifact; the **driver's ingest** performs the in-place overwrite
+   — phases never write the tree themselves (principle 5). In-place update only catches
+   drift introduced **through** the system; the **drift sync** (below) closes the complementary blind
+   spot — code committed **outside** the system between sessions. `index.md` records the last reconciled
+   commit, and both drivers compare it to `HEAD` at session start, holding a sync gate on any external
+   delta so already-resolved/invalidated work is reconciled before the loop advances. Defined in the
+   `continue` base skill (`references/sync.md`); inherited by `orchestrator`.
 4. **Every gate earns its interruption.** A human gate sits on every phase→phase arrow, but a gate
    must surface crucial information or force a real decision — never "looks good?". A gate with
    nothing to decide is a design smell, not a step. (Gates may be relaxed later if proven needless.)
-5. **Base skill + thin drivers, standalone skills.** A `continue` **base skill** defines the
-   structure (artifact tree, storage, invariants, bootstrap, phase graph) and is loaded whenever you
-   work in the system; it is also the default driver that runs the **next single phase** and stops.
-   The `orchestrator` builds on it for unattended **full-loop** runs. Every phase skill is also
-   directly invocable on its own.
+5. **Base/init skills + thin drivers, pure standalone skills.** Only three skills know "the system" —
+   the artifact tree, `index.md`, stable IDs, storage, and chaining: `setup` (init), the `continue`
+   **base skill** (which defines that structure + phase graph and is the default driver that runs the
+   **next single phase** and stops), and `orchestrator` (the full-loop variant built on `continue`).
+   **Every other skill is a pure, system-agnostic transform**: it takes inputs the driver provides and
+   **emits a result** (the result contract) knowing nothing of the tree/IDs/storage/next-skill. The
+   driver **assembles** a phase's inputs before and **ingests** its result after — the only writes to
+   the tree. Phase skills emit an in-context result block; `to-*` transition skills (fan-out → many
+   artifacts) write `.sdlc/scratch/` files. Postures may still be composed (they're generic, not the
+   system). Every skill is thus directly invocable on its own — standalone, it just emits its result
+   and creates no tree. See the `continue` base skill's `references/handoff.md`.
 6. **Auto-advance only when asked for it.** `continue` runs one phase, holds its gate, and stops —
    the operator drives step by step. `orchestrator` is the opt-in variant that, on an explicit "yes"
    at each gate, auto-advances to the next phase — one continuous driven session.
@@ -48,7 +62,9 @@ fit together.
    artifact out. Names are SDLC phase verbs.
 2. **Transition skills (`to-<phase>`)** — move work *between* phases. This is where **fan-out /
    decomposition** and **stakeholder/user feedback** happen (one artifact → many). They add real
-   logic, not just reformat.
+   logic, not just reformat. Because they fan out to many artifacts, they emit via **`.sdlc/scratch/`
+   files** (one per artifact) rather than an in-context block — the `to-` prefix is the visible
+   "writes scratch files" signal; the driver ingests them.
 3. **Posture skills** — cross-cutting disciplines invoked *from inside* any phase. Descriptive
    names, no fixed position in the loop.
 
@@ -94,16 +110,17 @@ Folder name always equals the frontmatter `name`.
 
 - **Init (once):** invoke `setup` to choose where the tree is generated (default `docs/sdlc/`) and
   scaffold its single `index.md`. It also orients greenfield vs brownfield (+ stack), recorded as
-  `index.md` status — detection only, no code inventory. Optional — a driver/phase falls back to the
-  default root if skipped.
-- **Next step (default):** invoke `continue`; it reads `index.md`, runs the next single phase, holds
-  the gate, and stops. Run it again for the following step.
+  `index.md` status — detection only, no code inventory. Optional — a driver falls back to the
+  default root if skipped (only `setup`/`continue`/`orchestrator` ever create the tree).
+- **Next step (default):** invoke `continue`; it reads `index.md`, **assembles** the next phase's
+  inputs, runs that one phase, **ingests** its emitted result into the tree, holds the gate, and stops.
+  Run it again for the following step.
 - **Full project (unattended):** invoke the `orchestrator`; it walks the loop, gating and
-  auto-advancing through every phase.
-- **Sub-chain:** invoke any phase skill, or `continue`/`orchestrator` starting mid-loop (e.g. a known
-  requirement → `design`) without earlier phases.
-- **Single skill:** invoke one phase skill directly for a one-off (e.g. `implement` a typo fix).
-  Creates only the minimal artifact tree; no requirements/ ceremony.
+  auto-advancing through every phase (same assemble/ingest around each).
+- **Sub-chain:** invoke `continue`/`orchestrator` starting mid-loop (e.g. a known requirement →
+  `design`) without earlier phases.
+- **Single skill:** invoke one phase skill directly for a one-off (e.g. `implement` a typo fix). It
+  emits its result and creates **no tree**; run `continue` afterward if you want it persisted.
 
 Composability extends to the **artifact tree**: levels materialize only when their producing skill
 runs (see next section).
@@ -219,10 +236,14 @@ The `implement` loop and `review` can each call either or both as a completion g
 
 ## Storage / I/O layer
 
-Skills must **not** hardcode storage paths. The structure and all artifact read/write are owned by
-the **`continue` base skill** (`skills/continue/SKILL.md`); its `references/artifact-io.md` binds each
-abstract artifact (Constitution, Specification, Stakeholder, Requirement, Plan, Task, SessionSummary,
-plus Deploy/Maintenance state) to storage operations.
+Non-system skills **never touch storage at all** — they emit a **result** (the result contract) and
+the driver persists it. The structure and all artifact read/write are owned by the **`continue` base
+skill** (`skills/continue/SKILL.md`): its `references/artifact-io.md` binds each abstract artifact
+(Constitution, Specification, Stakeholder, Requirement, Plan, Task, SessionSummary, plus
+Deploy/Maintenance state) to storage operations, and its `references/handoff.md` defines the result
+contract, the `.sdlc/scratch/` convention (only `to-*` skills write there), and the driver's
+**input-assembly** (before a phase) and **ingest** (after) — the seam between the system and the pure
+transforms.
 
 - **Canonical store: local files**, versioned with code (the `docs/<root>/` tree above; root chosen at
   `setup`, default `docs/sdlc/`, discovered via the single `index.md`). There is no swappable backend:
@@ -245,5 +266,6 @@ Authored in dependency order (all ✅):
 the configurable tree root).
 
 Authoring contract (held by every skill): folder name = frontmatter `name`; abstract Inputs/Outputs
-declared; storage via the `continue` base skill; thin operational core under the instruction ceiling +
-a `references/` directory for depth. The mined example drafts were replaced as each real skill landed.
+declared; non-system skills emit a **result** (the driver persists it via the `continue` base skill) and
+never touch the tree/IDs/storage themselves; thin operational core under the instruction ceiling + a
+`references/` directory for depth. The mined example drafts were replaced as each real skill landed.

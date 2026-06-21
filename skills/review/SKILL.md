@@ -29,20 +29,20 @@ adversarial review, `review` **invokes `doubt`** for the deep correctness pass a
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** the implemented + verified slice (code/diff, its **Tasks**, the **SessionSummary**
-  `[REQ-n.SESSION]` for what changed), plus the **Spec/Requirement**, the **Plan** `[REQ-n.DESIGN]`,
-  and the **Constitution** `[CONST]` to review against.
-- **Output:** findings + a disposition each. No new tree artifact — record findings/disposition as
-  gate state in `index.md` and the SessionSummary (as `test`/`verify` record results). Findings that
-  warrant rework re-enter `implement`; a stale upstream artifact re-enters `specify`/`design`.
+- **Input:** the implemented + verified slice (code/diff, its **Tasks**, the **SessionSummary** for
+  what changed), plus the **Spec/Requirement**, the **Plan**, and the **Constitution** to review
+  against — all provided by the caller.
+- **Output:** findings + a disposition each, emitted per the result contract. No new artifact and no
+  SDLC storage — the driver records the gate state. Each finding carries a routing hint (rework → back
+  to `implement`; a stale upstream artifact → back to `specify`/`design`); the driver routes.
 
 ## Process
 
 ### 1. Read what to review against
 
-Read `[CONST]` (standing bars), the Spec/Requirement (the *right thing?*), the Plan (the *planned
-way?*), the Tasks' acceptance criteria, and the SessionSummary (what changed). Without the intended
-contract, a review is just opinion.
+Read the **Constitution** (standing bars), the Spec/Requirement (the *right thing?*), the Plan (the
+*planned way?*), the Tasks' acceptance criteria, and the SessionSummary (what changed). Without the
+intended contract, a review is just opinion.
 
 ### 2. Correctness — invoke `doubt`
 
@@ -54,14 +54,14 @@ needs behavioral confirmation.
 
 Check the code against the Spec, Requirement, and Plan: did the implementation **diverge** from what
 those artifacts say? Two outcomes: the code is wrong → finding; or the artifact is now stale because
-the implementation legitimately learned something → route it back to `specify`/`design` for an
-**in-place update** (never let spec and code silently diverge — the field's top failure mode). Run
-the artifact **gate-validation** (no dangling / duplicate / orphan / unreachable IDs) per
-the `continue` base skill.
+the implementation legitimately learned something → a finding hinting an **in-place update** to
+`specify`/`design` (never let spec and code silently diverge — the field's top failure mode). This is
+the content-level consistency check; the structural gate-validation over the tree (dangling /
+duplicate / orphan / unreachable IDs) is the driver's job at ingest, not review's.
 
 ### 4. Quality — against the constitution's bars
 
-Measure against `[CONST]`'s principles, simplicity defaults, and boundaries. Separate **blockers**
+Measure against the **Constitution**'s principles, simplicity defaults, and boundaries. Separate **blockers**
 (must fix before ship) from **improvements** (worth doing, not gating). Don't invent bars the
 constitution doesn't set.
 
@@ -72,11 +72,11 @@ Classify each (mirrors `doubt`'s reconcile): **fix** (real + actionable → re-e
 or **noise** (correct under context the review lacked → note and drop). Re-read the code against each
 finding before classifying — rubber-stamping is the same failure as ignoring.
 
-### 6. Gate → deploy
+### 6. Gate
 
 Present findings and dispositions and force the decision: *"Are findings resolved or consciously
-accepted as trade-offs?"* This gate earns its interruption — it's the last point before ship. On
-explicit approval, hand off to `deploy`.
+accepted as trade-offs?"* This gate earns its interruption — it's the last point before ship. Surface
+it for the caller — standalone, present it to the user; under a driver, the driver holds the gate.
 
 ## Composability (big↔small)
 
@@ -95,14 +95,15 @@ the anti-staleness check when an artifact tree exists.
 - Rubber-stamping or reflexively deferring to a finding without re-reading the code.
 - Forgetting that a legitimate divergence means an artifact update (`specify`/`design`), not just a
   code change.
+- Running the structural tree gate-validation or persisting findings — that's the driver, not review.
 
 ## Verification
 
-- [ ] Reviewed against `[CONST]`, the Spec/Requirement, and the Plan — not from memory.
+- [ ] Reviewed against the **Constitution**, the Spec/Requirement, and the Plan — not from memory.
 - [ ] `doubt` invoked for the correctness pass (not reimplemented).
-- [ ] Consistency/anti-staleness pass run; gate-validation clean; divergences routed to code-fix
-      *or* in-place artifact update.
+- [ ] Content-level consistency/anti-staleness pass run; divergences flagged as code-fix *or* in-place
+      artifact-update findings (structural gate-validation left to the driver).
 - [ ] Quality measured against the constitution's bars; blockers separated from improvements.
 - [ ] Every finding given a disposition (fix / accept-as-trade-off / noise), re-read before classing.
-- [ ] Fix-findings re-entered `implement`; accepted trade-offs documented for the user.
-- [ ] The gate decision was posed and explicit approval received before handing to `deploy`.
+- [ ] Findings emitted per the result contract with routing hints; not persisted by the skill.
+- [ ] The gate decision was posed (caller/driver holds it).

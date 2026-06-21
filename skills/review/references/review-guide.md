@@ -13,7 +13,7 @@ constitution), and it disposes findings for a human decision. The split:
 |---|---|---|
 | Correctness | Does it work and hold under scrutiny? | invoke **`doubt`** (+ `verify`/`test`) |
 | Consistency | Does code still match spec/plan? Any stale artifact? | the analyze pass (below) |
-| Quality | Does it meet the constitution's bars? | measure vs. `[CONST]` |
+| Quality | Does it meet the constitution's bars? | measure vs. the **Constitution** |
 | Disposition | What happens to each finding? | fix / trade-off / noise |
 
 Delegating correctness to `doubt` is what keeps `review` lean — it adds the consistency, quality, and
@@ -27,12 +27,12 @@ artifacts in hand. Two distinct failure directions:
 
 1. **Code wrong, artifact right** → a normal finding; fix the code (re-enter `implement`).
 2. **Code right, artifact stale** → implementation legitimately learned something the spec/design
-   didn't anticipate. The fix is to **update the artifact in place** (`specify`/`design`), not to
-   "correct" working code back to a wrong spec. This is the anti-staleness rule enforced at the gate.
+   didn't anticipate. The fix is a finding hinting an **artifact update** (`specify`/`design`), not
+   "correcting" working code back to a wrong spec. This is the anti-staleness rule.
 
-Also run the structural **gate-validation** from the `continue` base skill: fail on any dangling,
-duplicate, orphan, or unreachable ID. A green consistency pass means code and the artifact tree agree
-*and* the tree is internally sound.
+This is the **content-level** consistency check — does code agree with what the artifacts say. The
+**structural** gate-validation over the tree (dangling / duplicate / orphan / unreachable IDs) is the
+driver's job at ingest, not review's; review just reports content divergences as findings.
 
 ## Finding disposition (precedence, first match wins)
 
@@ -57,26 +57,25 @@ silent, surface it to the user rather than guessing.
 
 `review` describes *what* to check, not *which tool*. A project may already have review tooling
 (linters, CI, a `/code-review` or `/security-review` command, role-based reviewer agents). Bind to
-those through the **constitution / `[CONST]` references**, the same way commands resolve — don't
-hardcode a specific tool in this skill. For security-sensitive slices, a dedicated security pass
-(e.g. the repo's `/security-review`) is a reasonable thing for `[CONST]` to mandate; `review` invokes
-what the project declares.
+those through the **Constitution**'s references, the same way commands resolve — don't hardcode a
+specific tool in this skill. For security-sensitive slices, a dedicated security pass (e.g. the repo's
+`/security-review`) is a reasonable thing for the **Constitution** to mandate; `review` invokes what
+the project declares.
 
-## Worked example — REQ-03 saved-search alerts
+## Worked example — saved-search alerts
 
 ```
-Against: spec (daily digest, dedupe), plan (idempotent job), CONST (simplicity, run-tests-before-commit).
+Against: spec (daily digest, dedupe), plan (idempotent job), Constitution (simplicity, run-tests-before-commit).
 
 Correctness (doubt):
 - BLOCKER  Job isn't idempotent under retry — dedupe set built per-run, not persisted. → fix (re-implement)
 - noise    "No backpressure on email send" — out of scope per spec; note in Open.
 
-Consistency:
+Consistency (content-level):
 - STALE ARTIFACT  Implementation added per-search mute; spec doesn't mention it. Code is the right
-  behavior → update spec in place (specify), don't strip the feature.
-- gate-validation: clean.
+  behavior → finding hinting a spec update (specify), don't strip the feature.
 
-Quality (vs CONST):
+Quality (vs the Constitution):
 - improvement  Digest builder duplicates the search query builder — extract shared fn (not gating).
 
 Disposition: 1 blocker → implement; 1 spec update → specify; 1 improvement → backlog; trade-offs: none.

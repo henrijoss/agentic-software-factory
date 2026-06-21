@@ -11,10 +11,10 @@ split lets the human approve the *approach* at one gate before any decomposition
 
 | Concern | Belongs in | Why |
 |---|---|---|
-| What the slice must achieve, success criteria | **Spec** `[SPEC]` / Requirement | the *what*, decided upstream |
-| Approach, architecture, key decisions, risks | **Design** `[REQ-n.DESIGN]` | the *how* — this skill |
+| What the slice must achieve, success criteria | **Spec** / Requirement | the *what*, decided upstream |
+| Approach, architecture, key decisions, risks | **Design** | the *how* — this skill |
 | Sized, ordered tasks; dependency graph; checkpoints | **`to-tasks`** | decomposition of an approved approach |
-| Stack, conventions, boundaries | **Constitution** `[CONST]` | standing — design inherits, never restates |
+| Stack, conventions, boundaries | **Constitution** | standing — design inherits, never restates |
 
 Discriminator: if a line is a *unit of work to schedule*, it's a task (→ `to-tasks`); if it's a
 *decision about how the pieces fit*, it's design.
@@ -57,7 +57,7 @@ before the plan stands.
 ## Full template
 
 ```markdown
-# Design — [REQ-n: requirement title]
+# Design — [requirement title]
 
 ## Approach
 <!-- The shape of the solution in a few sentences: key components, data flow, integration points. -->
@@ -80,7 +80,7 @@ Sections beyond Approach are optional; delete what doesn't apply rather than lea
 ## Worked example
 
 ```markdown
-# Design — REQ-03: saved-search alerts
+# Design — saved-search alerts
 
 ## Approach
 Persist each saved search as a row keyed to the user. A daily scheduled job re-runs each saved
@@ -108,9 +108,9 @@ Note: no task list, no sizing, no ordering — that's `to-tasks`. No mention of 
 
 ## Re-entry (anti-staleness)
 
-When implementation reveals the approach was wrong, re-run `design` — it **overwrites `design.md` in
-place**. Never create `design-v2.md`. Update the design *first*, then let `to-tasks`/`implement`
-re-derive from it; gate-validation at the next gate confirms no reference went stale.
+When implementation reveals the approach was wrong, re-run `design` and emit the revised plan — the
+driver **overwrites the existing design in place** on ingest, never a parallel copy. Update the design
+*first*, then let `to-tasks`/`implement` re-derive from it.
 
 ## Anti-patterns
 

@@ -7,7 +7,7 @@ slicing, sizing, templates, and a worked example live here.
 
 | Concern | Belongs in | Why |
 |---|---|---|
-| Approach, architecture, key decisions, risks | **`design`** `[REQ-n.DESIGN]` | the *how* — decided and approved before decomposition |
+| Approach, architecture, key decisions, risks | **`design`** | the *how* — decided and approved before decomposition |
 | Sized/ordered Tasks, dependency graph, checkpoints | **`to-tasks`** | decomposition of the approved approach — this skill |
 | Writing the code, per-session discipline | **`implement`** + `incremental` | execution of a task |
 
@@ -64,7 +64,7 @@ contains "and".
 ## Task template (full)
 
 ```markdown
-# TASK-m — [short descriptive title]   (REQ-n.TASK-m)
+# [short descriptive title]
 
 **Does:** [one paragraph — what this task accomplishes and why]
 
@@ -73,11 +73,11 @@ contains "and".
 - [ ] [specific, testable condition]
 
 **Verify:**
-- [ ] tests pass: [command from CONST]
-- [ ] build succeeds: [command from CONST]
+- [ ] tests pass: [command from the Constitution]
+- [ ] build succeeds: [command from the Constitution]
 - [ ] manual: [what to check, if applicable]
 
-**Depends on:** [task IDs, or none]
+**Depends on:** [which other tasks, or none]
 **Files likely touched:** [paths]
 **Scope:** [XS | S | M]   (L+ → break down further)
 ```
@@ -97,7 +97,7 @@ tasks come early (fail fast). Insert a checkpoint after each group:
 As a transition skill, fan-out is also a **feedback moment**: present the set and ordering and let the
 user reshape it before the gate.
 
-## Worked example — REQ-03 saved-search alerts
+## Worked example — saved-search alerts
 
 ```
 Dependency graph:

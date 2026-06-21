@@ -121,10 +121,9 @@ adds only durable principles, the few fixed constraints, boundaries, and one tra
 
 ## Re-entry (anti-staleness)
 
-When values harden or a constraint changes, re-run `constitution` — it **overwrites
-`constitution.md` in place**. Never create `constitution-v2.md` or a parallel section; git history is
-the versioning. After amending, the gate-validation at the next gate confirms no reference went
-stale.
+When values harden or a constraint changes, re-run `constitution` and emit the revised constitution —
+the driver **overwrites the existing constitution in place** on ingest, never a parallel copy; git
+history is the versioning.
 
 ## Anti-patterns (expanded)
 

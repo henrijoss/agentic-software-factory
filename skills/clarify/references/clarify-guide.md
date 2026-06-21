@@ -17,8 +17,8 @@ problem is upstream — kick back to `to-requirements`/`specify`. Clarify deepen
 
 ## Relationship to `interview` and `specify`
 
-- **`interview` is the engine.** Clarify is "run `interview`, scoped to one requirement, then write
-  the result in place and gate." All the one-question-at-a-time, guess-attached, want-vs-should-want,
+- **`interview` is the engine.** Clarify is "run `interview`, scoped to one requirement, then emit
+  the ready requirement and gate." All the one-question-at-a-time, guess-attached, want-vs-should-want,
   95%-stop discipline lives in `interview` — don't restate it here.
 - **`specify` is the sibling caller.** Same engine, different altitude: `specify` interviews to pin
   the whole Spec's objective/scope/success; `clarify` interviews to pin one Requirement's acceptance.

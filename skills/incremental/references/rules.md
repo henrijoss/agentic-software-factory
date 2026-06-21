@@ -21,7 +21,7 @@ against:
 
 Implement the naive, obviously-correct version first; optimize only after correctness is proven.
 Three similar lines beat a premature abstraction. (This is the constitution's simplicity trade-off
-default made operational at the keystroke level — if `[CONST]` sets a different default, follow it.)
+default made operational at the keystroke level — if the **Constitution** sets a different default, follow it.)
 
 ## Rule 0.5 — Scope discipline
 

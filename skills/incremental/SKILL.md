@@ -29,7 +29,7 @@ while turning tasks into code; it returns nothing but a cleaner, safer execution
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** a Task (or small set) to execute, plus the **Constitution** `[CONST]` for the project's
+- **Input:** a Task (or small set) to execute, plus the **Constitution** for the project's
   build/test commands and boundaries (resolve commands there — never hardcode them here).
 - **Output:** none of its own. It shapes how `implement` produces code; verification of each slice
   routes through the `verify`/`test` skills.
@@ -40,7 +40,7 @@ For each slice: **Implement → Verify → Commit → Next.**
 
 1. **Implement** the smallest complete piece of functionality.
 2. **Verify** it works — run `verify`/`test` per the task (tests pass, build succeeds, behavior
-   confirmed). Use the project's commands from `[CONST]`.
+   confirmed). Use the project's commands from the **Constitution**.
 3. **Commit** with a descriptive message once the slice is green.
 4. **Next slice** — carry forward, don't restart.
 
@@ -92,4 +92,4 @@ Depth, code examples, and the simplicity/scope checks live in `references/rules.
 - [ ] Each increment did one logical thing; refactors kept separate from features.
 - [ ] Simplest-thing-that-works chosen; no abstraction added before a third use case.
 - [ ] Scope held to the task; out-of-scope finds noted, not fixed.
-- [ ] Build/test commands came from `[CONST]`, not hardcoded here.
+- [ ] Build/test commands came from the **Constitution**, not hardcoded here.

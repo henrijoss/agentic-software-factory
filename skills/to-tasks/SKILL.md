@@ -18,7 +18,7 @@ write code (that's `implement`, downstream).
 
 ## When to Use
 
-- A Plan `[REQ-n.DESIGN]` is approved and needs decomposing into implementable units.
+- A Plan is approved and needs decomposing into implementable units.
 - Work needs ordering, checkpointing, or parallelizing across sessions/agents.
 - A task feels too large or vague to start.
 
@@ -30,18 +30,19 @@ write code (that's `implement`, downstream).
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** one approved **Plan** `[REQ-n.DESIGN]`, the **Constitution** `[CONST]` (for the
-  project's build/test commands and boundaries — resolve them there, never hardcode), and the parent
-  **Requirement** `[REQ-n]` for acceptance context.
-- **Output:** N **Task** artifacts `[ID: REQ-n.TASK-m]` plus a dependency graph/order. Storage
-  resolves through the `continue` base skill (default: `requirements/REQ-<n>/tasks/TASK-<m>.md`, each
-  registered in `index.md`).
+- **Input:** one approved **Plan**, the **Constitution** (for the project's build/test commands and
+  boundaries — resolve them there, never hardcode), and the parent **Requirement** for acceptance
+  context — all provided by the caller.
+- **Output:** N **Tasks** plus a dependency graph/order. As a transition skill it fans out to **many**
+  artifacts, so it writes one **scratch file per Task** under `.sdlc/scratch/` (each with
+  result-contract front-matter) plus the dependency graph/order; the driver ingests them into the tree.
+  The skill writes only scratch — never the tree or `index.md`.
 
 ## Process
 
 ### 1. Read the approved Plan and context
 
-Read the Plan `[REQ-n.DESIGN]`, the Requirement `[REQ-n]`, and `[CONST]`. Decompose the *approved*
+Read the **Plan**, the **Requirement**, and the **Constitution**. Decompose the *approved*
 approach — don't re-open design decisions here; if the approach turns out wrong, return to `design`.
 
 ### 2. Map the dependency graph
@@ -53,8 +54,8 @@ graph; foundations first. Note what can run in parallel vs. what must be sequent
 
 Slice into vertical, end-to-end units (create → list → edit), not horizontal layers. Each Task is
 **S–M sized** (1–5 files, one focused session); anything larger is broken down further. Each Task
-carries acceptance criteria and a verification step (using `[CONST]` commands). See the task shape
-below.
+carries acceptance criteria and a verification step (using the **Constitution**'s commands). See the
+task shape below.
 
 ### 4. Order, checkpoint, fan out for feedback
 
@@ -62,16 +63,18 @@ Order so dependencies are satisfied, each task leaves the system working, and hi
 early (fail fast). Add checkpoints between groups. As a transition skill, **pause for user feedback**
 on the decomposition while fanning out — the task set and ordering are the user's to shape.
 
-### 5. Write the Tasks in place
+### 5. Write the fan-out to scratch
 
-Write each Task via artifact-io (default `requirements/REQ-<n>/tasks/TASK-<m>.md`) and register each
-`REQ-n.TASK-m` in `index.md`. Re-entry **updates tasks in place** — never fork a parallel set.
+Write one file per Task under `.sdlc/scratch/` plus the dependency graph/order, each with the
+result-contract front-matter. Write **only** scratch; the driver ingests the tasks into the tree,
+assigns IDs, and updates any existing set in place.
 
-### 6. Gate → implement
+### 6. Gate
 
 Present the task set, dependency graph, and order, and force the decision: *"Are the tasks sized and
 ordered, and is the dependency graph correct?"* This gate earns its interruption: `implement` commits
-session-by-session to this decomposition. On explicit approval, hand off to `implement`.
+session-by-session to this decomposition. Surface it for the caller — standalone, present it to the
+user; under a driver, the driver holds the gate and advances to `implement`.
 
 ## Task shape
 
@@ -79,13 +82,13 @@ Short form below; template, sizing table, slicing, and a worked example live in
 `references/breakdown-guide.md`.
 
 ```markdown
-# TASK-m — [short title]   (REQ-n.TASK-m)
+# [short task title]
 
 **Does:** [one paragraph — what this task accomplishes]
 **Acceptance:**
 - [ ] [specific, testable condition]
-**Verify:** [test / build / manual check — commands from CONST]
-**Depends on:** [task IDs, or none]
+**Verify:** [test / build / manual check — commands from the Constitution]
+**Depends on:** [which other tasks, or none]
 **Scope:** [S: 1–2 files | M: 3–5 files]
 ```
 
@@ -102,16 +105,17 @@ smallest set of well-ordered, verifiable units.
 - No verification step on a task; "and" in a task title (it's two tasks).
 - All tasks L/XL-sized — decompose further (agents perform best on S/M).
 - Dependency order not considered; no checkpoints between phases.
-- Hardcoding `npm`/`tsc`/etc. instead of resolving commands from `[CONST]`.
+- Hardcoding `npm`/`tsc`/etc. instead of resolving commands from the **Constitution**.
 - Fanning out without pausing for user feedback on the decomposition.
+- Writing into the tree/`index.md` instead of scratch files (the driver ingests scratch).
 
 ## Verification
 
 - [ ] Decomposed the approved Plan; approach not re-opened.
 - [ ] Dependency graph mapped; order satisfies it (foundations + high-risk first).
 - [ ] Tasks vertically sliced; each S–M, none larger.
-- [ ] Every task has acceptance criteria and a verification step (commands from `[CONST]`).
+- [ ] Every task has acceptance criteria and a verification step (commands from the **Constitution**).
 - [ ] User feedback taken on the decomposition during fan-out.
-- [ ] Each Task written via artifact-io as `REQ-n.TASK-m` and registered in `index.md`.
-- [ ] Re-entry updated tasks in place — no duplicate set.
-- [ ] The gate decision was posed and explicit approval received before handing to `implement`.
+- [ ] Fan-out written to `.sdlc/scratch/` per the result contract (a file per Task + dep graph);
+      nothing written to the tree/`index.md` by the skill.
+- [ ] The gate decision was posed (caller/driver holds it and advances to `implement`).

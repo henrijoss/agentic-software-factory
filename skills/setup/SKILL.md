@@ -31,8 +31,9 @@ lives where it can't go stale — harvested by reference in `constitution`, read
 - A tree already exists — setup is a no-op that reports the existing root (never fork a second tree);
   just run `continue` / the phase you need.
 - As a phase or a driver — it neither owns an artifact nor sequences the loop.
-- A one-off single-skill task may skip explicit setup; the driver/phase bootstrap fallback creates the
-  default `docs/sdlc/` root on first write (see the `continue` base skill).
+- A one-off single-skill task may skip explicit setup; if it's later persisted, the driver's bootstrap
+  fallback creates the default `docs/sdlc/` root when `continue` first runs (see the `continue` base
+  skill). A standalone non-system skill creates no tree on its own.
 
 ## Inputs / Outputs (abstract)
 
@@ -73,27 +74,29 @@ operator (a light confirmation — this is not a loop gate, just "generate the t
 Create the single entry point `index.md` at the chosen location using the **minimal-root template**
 defined by the `continue` base skill (tree map placeholder + empty ID registry + status). Set the
 status from Step 2: greenfield → `bootstrapped — no phases run yet`; brownfield →
-`bootstrapped (brownfield: <stack>) — no phases run yet`. Create nothing else — levels materialize
-when their producing phase runs.
+`bootstrapped (brownfield: <stack>) — no phases run yet`. Initialize `Last synced commit` to the current
+`HEAD` (`git rev-parse HEAD`), or `none` if there is no repo/commit yet — just set the value; the
+template/field is defined by the base skill. Create nothing else — levels materialize when their
+producing phase runs.
 
 ### 5. Hand off
 
 Report the root path and that the project is bootstrapped. Hand off to `constitution` (or whatever the
 operator's entry intent is) — when brownfield, note that `constitution` should **harvest** existing
-standing docs and capture existing-system facts as references/constraints. From here on, drivers and
-phases discover this `index.md` automatically.
+standing docs and capture existing-system facts as references/constraints. From here on, the drivers
+discover this `index.md` automatically and ingest each phase's emitted result into it.
 
 ## Composability (big↔small)
 
-A full project runs `setup` once, then walks the loop. A tiny one-off can skip it and let the
-bootstrap fallback create the default `docs/sdlc/` root on first write. Either way there is exactly
-one tree with one entry point.
+A full project runs `setup` once, then walks the loop. A tiny one-off can skip it and let the driver's
+bootstrap fallback create the default `docs/sdlc/` root the first time `continue` persists a result.
+Either way there is exactly one tree with one entry point.
 
 ## Red Flags
 
 - Creating a second `index.md` when one already exists (forking the tree) instead of reporting it.
 - Hardcoding `docs/sdlc/` as if immutable — it is the **default**, not the only, location.
-- Scaffolding artifacts beyond the minimal `index.md` (phases create their own).
+- Scaffolding artifacts beyond the minimal `index.md` (the driver writes them as phases run).
 - Writing a current-state / code-inventory artifact in setup — a staleness bomb; setup owns no
   artifact, and existing code is read live by `design`, referenced by `constitution`.
 - Turning the orient glance into a deep codebase analysis (that's `constitution` harvest / `design`).
@@ -105,6 +108,7 @@ one tree with one entry point.
 - [ ] Orient glance ran read-only; greenfield/brownfield (+ stack) reflected in `index.md` status only.
 - [ ] No code inventory / current-state artifact written.
 - [ ] Tree root chosen as `docs/<root>/` (default `sdlc`); location confirmed with the operator.
-- [ ] A single minimal `index.md` created at the chosen location (and nothing else).
+- [ ] A single minimal `index.md` created at the chosen location (and nothing else), with
+      `Last synced commit` initialized to current `HEAD` (or `none`).
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.

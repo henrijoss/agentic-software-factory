@@ -37,25 +37,32 @@ instruction-budget discipline holds: only the active phase's `SKILL.md` is in co
   skill's `references/phase-graph.md`) and `index.md` (current tree + status). Plus `[CONST]`, which
   every phase loads.
 - **Output:** a driven, gated session that advances the project across many phases; `index.md`'s
-  **status dashboard** kept current as each phase completes. The orchestrator writes no phase artifact
-  itself — each phase writes its own via the storage rules in the `continue` base skill.
+  **status dashboard** kept current as each phase completes. Phases emit results (pure transforms); the
+  driver **ingests** each into the tree via the `continue` base skill — the orchestrator never asks a
+  phase to write tree state itself.
 
 ## Process
 
 ### 1. Defer to the base skill for structure and the next phase
 
-Load the `continue` base skill for the artifact tree, storage, root resolution, gate-validation, and
-the phase graph. Resolve the tree root (discover the single `index.md`; if none, `setup` or the
-fallback creates the default `docs/sdlc/` root). Resolve the entry mode
+Load the `continue` base skill for the artifact tree, storage, root resolution, gate-validation, the
+phase graph, and the **sync/drift check** (`references/sync.md`). Resolve the tree root (discover the
+single `index.md`; if none, `setup` or the fallback creates the default `docs/sdlc/` root). Run the
+sync check at session start; if external commits since `Last synced commit` are detected, hold the sync
+gate and reconcile **before** advancing — like every gate, no auto-advance past unresolved drift.
+Resolve the entry mode
 (full / sub-chain) and the start phase from `index.md` status + the phase graph; confirm the start
 point with the user when it isn't unambiguous. If the intent is a single one-off skill, defer to that
 phase skill directly — don't spin up the loop.
 
-### 2. Run one phase
+### 2. Assemble inputs, run one phase, ingest the result
 
-Load **only** the active phase's `SKILL.md` and run it. The phase reads its inputs and `[CONST]`, does
-its work (invoking postures as it needs), writes its artifact, and produces its **gate** — do not
-pre-empt or duplicate the phase's internal logic.
+Per the `continue` base skill (`references/handoff.md`): **assemble** the phase's inputs from the tree
+and pass them as content. Load **only** the active phase's `SKILL.md` and run it — a pure transform that
+does its work (invoking postures as it needs) and **emits a result** (in-context block, or
+`.sdlc/scratch/` for `to-*`); do not pre-empt or duplicate its internal logic, and don't let it touch
+the tree. Then **ingest** the result: resolve/assign the ID, write to the tree (in place on re-entry),
+register in `index.md`, clear scratch.
 
 ### 3. Hold the gate
 
@@ -100,7 +107,8 @@ actually needs; no phase or tree level is mandatory.
 
 ## Verification
 
-- [ ] Structure, graph, bootstrap, and gate-validation deferred to the `continue` base skill.
+- [ ] Structure, graph, bootstrap, gate-validation, and the sync/drift check deferred to the `continue`
+      base skill; sync check run at session start, drift (if any) reconciled at its gate before advancing.
 - [ ] Entry mode resolved; single steps deferred to `continue`, single one-offs to the phase skill.
 - [ ] `index.md` entry point ensured (bootstrap idempotent) before any phase ran.
 - [ ] Exactly one phase skill loaded/run at a time, in graph order.

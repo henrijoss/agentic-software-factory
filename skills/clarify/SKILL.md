@@ -31,18 +31,18 @@ Requirement.
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** one draft **Requirement** `[REQ-n]` (from `to-requirements`), its **Stakeholders**
-  `[STK-n]`, and the **Constitution** `[CONST]`.
-- **Output:** the same **Requirement** `[REQ-n]`, **updated in place** to *ready* — sharp acceptance
-  criteria, open questions resolved or explicitly deferred. Storage resolves through
-  the `continue` base skill (default: `requirements/REQ-<n>/requirement.md`, in place).
+- **Input:** one draft **Requirement**, its **Stakeholders**, and the **Constitution** — all provided
+  by the caller.
+- **Output:** the same **Requirement** brought to *ready* — sharp acceptance criteria, open questions
+  resolved or explicitly deferred — emitted per the result contract for the caller to ingest. The skill
+  writes no files and resolves no storage.
 
 ## Process
 
 ### 1. Read the draft and its context
 
-Read `[REQ-n]` (the use-case, draft acceptance, open questions), its Stakeholders, and `[CONST]`.
-Clarify *this one* requirement — don't re-open the fan-out (that's `to-requirements`).
+Read the **Requirement** (the use-case, draft acceptance, open questions), its **Stakeholders**, and the
+**Constitution**. Clarify *this one* requirement — don't re-open the fan-out (that's `to-requirements`).
 
 ### 2. Resolve the unknowns via `interview`
 
@@ -63,16 +63,17 @@ Every open question ends as **answered** or **deferred with a reason** (and, if 
 whether it blocks design). None left dangling — a dangling question becomes a silent assumption in
 `design`.
 
-### 5. Write the ready Requirement in place
+### 5. Emit the ready Requirement
 
-Update `[REQ-n]` via artifact-io — **overwrite in place**, never fork. The use-case stays; acceptance
-becomes ready; the open-questions section shrinks to resolved/deferred.
+Emit the ready Requirement per the result contract — the use-case stays; acceptance becomes ready; the
+open-questions section shrinks to resolved/deferred. Write no files; persistence and the in-place
+overwrite of the existing requirement are the driver's job.
 
-### 6. Gate → design
+### 6. Gate
 
 Force the readiness decision: *"Is this one requirement unambiguous enough to design against?"* The
 bar: could `design` proceed without guessing, and could `verify`/`test` check acceptance objectively?
-On explicit approval, hand off to `design`.
+Surface it for the caller — standalone, present it to the user; under a driver, the driver holds the gate.
 
 ## Ready Requirement shape
 
@@ -80,14 +81,14 @@ Short form below; the readiness checklist, sharpening technique, and a worked ex
 `references/clarify-guide.md`.
 
 ```markdown
-# REQ-n — [use-case title]   (ready)
+# [use-case title]   (ready)
 
-**As a** [STK-n] **I want** [capability] **so that** [value].
+**As a** [stakeholder] **I want** [capability] **so that** [value].
 **Acceptance:**
 - [ ] [sharp, testable criterion]
 **Out of scope:** [explicit non-goals]
 **Resolved / deferred:** [former open questions + their answer or deferral reason]
-**Stakeholders:** [STK-n, …]
+**Stakeholders:** [stakeholder, …]
 ```
 
 ## Composability (big↔small)
@@ -104,7 +105,7 @@ needs several rounds. If clarifying keeps re-opening scope, the issue is upstrea
 - Leaving acceptance vague enough that `verify`/`test` can't check it.
 - Dangling open questions that silently become assumptions downstream.
 - No out-of-scope line on the ready requirement.
-- Forking a second requirement file instead of updating in place.
+- Writing files / resolving storage instead of just emitting the result (that's the driver's job).
 
 ## Verification
 
@@ -112,6 +113,6 @@ needs several rounds. If clarifying keeps re-opening scope, the issue is upstrea
 - [ ] Open questions resolved via `interview` (invoked, not reimplemented).
 - [ ] Acceptance sharpened into testable criteria with edge cases and an out-of-scope line.
 - [ ] Every open question ended answered or explicitly deferred (none dangling).
-- [ ] `[REQ-n]` updated in place to ready — no duplicate artifact.
+- [ ] Emitted per the result contract; no files written / no storage resolved by the skill.
 - [ ] Readiness bar met: `design` could proceed without guessing; `verify` could check acceptance.
-- [ ] The gate decision was posed and explicit approval received before handing to `design`.
+- [ ] The gate decision was posed (caller/driver holds it).

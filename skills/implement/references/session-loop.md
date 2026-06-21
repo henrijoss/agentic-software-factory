@@ -24,7 +24,7 @@ Load the *right* slice, not everything:
 - the SessionSummary (where we are) + the current Task (what's next);
 - only the Plan sections relevant to this task;
 - only the source files this task touches, plus their direct collaborators;
-- `[CONST]` for commands and boundaries.
+- the **Constitution** for commands and boundaries.
 
 Do **not** load the whole spec tree, every requirement, or the entire codebase. More context is not
 more capability past the point where the signal is diluted — it's the cause of drift, not a defense
@@ -39,19 +39,19 @@ It is a handoff to a future agent (possibly you, with no memory of now). It answ
 - **Open** — unresolved decisions, blockers, things to watch, deferred-but-noted scope items.
 - **Touched** — key files/areas changed, so the next session knows where the work lives.
 
-Keep it tight — it's a pointer into the work, not a transcript. It is **updated in place** every
-session (anti-staleness rule); never fork `summary-2.md`.
+Keep it tight — it's a pointer into the work, not a transcript. Each session emits the latest summary;
+the driver **overwrites the prior summary in place** (anti-staleness), never forking a second one.
 
 ## Full template
 
 ```markdown
-# Session — REQ-n   (REQ-n.SESSION)
+# Session — [slice]
 
 ## Done
-- [TASK-m] [what shipped + acceptance met]
+- [task] [what shipped + acceptance met]
 
 ## Next
-- [TASK-k] [the immediate next unit + where to start]
+- [task] [the immediate next unit + where to start]
 
 ## Open
 - [unresolved decision / blocker / thing to watch]
@@ -72,6 +72,6 @@ session (anti-staleness rule); never fork `summary-2.md`.
 ## One-off composability
 
 For a typo or single-task fix, the loop collapses: one session, one task, run `incremental`, verify,
-done — no SessionSummary, no `requirements/` ceremony. Materialize the session layer only when the
-work actually spans sessions. The single-entry-point invariant still holds (`index.md` + the minimal
-artifacts).
+done — no SessionSummary, no requirements ceremony. Materialize the session layer only when the
+work actually spans sessions. (When a driver is persisting, its single-entry-point invariant still
+holds regardless of size — but that's the driver's concern, not this skill's.)
