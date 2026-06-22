@@ -108,17 +108,17 @@ Then, as the message's **last block**, present the **next-step hand-off** — th
 drive the project from here, and the operator should not have to guess which. Use the same capability
 ladder the driver's gate hand-off uses (`skills/continue/references/presentation.md`): **prefer an
 interactive picker** (in Claude Code, `AskUserQuestion`), **fall back to a `── NEXT ──` text footer**
-when no picker is available, and in **non-interactive/headless mode emit neither** (no human to act on
-it — just report the root and let the loop proceed). The options, first = recommended:
+when no picker is available. The options, first = recommended:
 
 1. **Step through it now** — run the next step interactively: `continue` runs the first phase
    (`constitution`) and stops at its gate; repeat `/continue` per step, staying in control. **Selecting
    this proceeds into that first step now.**
-2. **Run it unattended** — from the project root run `skills/continue/loop.sh`. It relaunches
-   `claude -p "/continue"` as a **fresh process per step** (context zeroed each step; `index.md` is the
-   carried memory), reading `.sdlc/loop-control` to advance / `halt` / finish. It honors `gatePolicy`:
-   the default `manual` halts at every gate, so set `auto` or `milestones` in `settings.json` for longer
-   unattended stretches (`MAX_STEPS` / `execution.maxSteps` caps the run).
+2. **Run it as a loop** — from the project root run `skills/continue/loop.sh`. It relaunches `/continue`
+   as a **fresh interactive process per step** (context zeroed each step; `index.md` is the carried
+   memory) — full TUI, normal permissions, the gate picker all work. You end each step's session when
+   it's done and the loop asks whether to continue. It honors `gatePolicy`: the default `manual` presents
+   a picker at every gate, so set `auto` or `milestones` in `settings.json` to skip the routine pickers
+   (`MAX_STEPS` / `execution.maxSteps` caps the run).
 3. **Work with the skills by hand** — invoke a single phase skill directly for a one-off, then run
    `/continue` afterward to persist it into the tree.
 
@@ -144,7 +144,7 @@ Either way there is exactly one tree with one entry point.
 - Omitting `settings.json`, or prompting for `version` / interrogating the operator for every key —
   `version` comes from the skillset, and only the relevant prefs are lightly confirmed; the rest default.
 - Handing off silently — reporting the root but not showing the three ways forward (step / loop / manual)
-  — leaving the operator to guess the entry point. (Skip the picker only in headless mode.)
+  — leaving the operator to guess the entry point.
 
 ## Verification
 
@@ -160,4 +160,4 @@ Either way there is exactly one tree with one entry point.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.
 - [ ] Next-step hand-off presented the three paths (step / loop / manual) as the last block — picker or
-      `── NEXT ──` footer interactively, with the one-line `loop.sh` explanation; nothing in headless mode.
+      `── NEXT ──` footer, with the one-line `loop.sh` explanation.

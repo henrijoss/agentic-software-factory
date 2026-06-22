@@ -71,8 +71,8 @@ Steps:
    writes the `[REQ-n.SESSION]` SessionSummary in place **and** sets the just-finished
    `[REQ-n.TASK-m]` status (`done`, or `blocked`) — the per-task status the next step reads
    to pick the next task. A **`to-tasks`** ingest sets the requirement's status to `tasks ready`,
-   or `tasks ready · deferred` when the gate resolved to defer implement (interactive
-   *Clarify next requirement*, or headless `requirements-first` with a draft requirement still
+   or `tasks ready · deferred` when the gate resolved to defer implement (the
+   *Clarify next requirement* pick, or `traversal: requirements-first` with a draft requirement still
    remaining) — the marker the next step's traversal reads (`SKILL.md` Step 4).
 5. **Gate-validate.** Run the structural validation (dangling / duplicate / orphan /
    unreachable → fail and surface). A `to-*` fan-out registers **all** produced artifacts

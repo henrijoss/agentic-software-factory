@@ -2,7 +2,8 @@
 
 A composable **SDLC agent skillset**: small, single-purpose [Claude Code skills](skills/) that cover
 every phase of the software lifecycle and chain together through **human gates**, driven by the thin
-`continue` base skill — one step per session, with a fresh-process loop script for unattended runs.
+`continue` base skill — one step per session, with a fresh-process loop script that relaunches it
+interactively per step.
 
 ## What it is
 
@@ -18,7 +19,7 @@ every phase of the software lifecycle and chain together through **human gates**
   sessions.
 - **A human gate on every transition — as much or as little as you want.** Each gate surfaces a real
   decision, never "looks good?". How many stop for a human is set by `gatePolicy` (`manual` =
-  every gate, default; `milestones` = the big ones; `auto` = unattended); the safety gates
+  every gate, default; `milestones` = the big ones; `auto` = skip the routine pickers); the safety gates
   (deploy/irreversible, sync drift, failed validation) always stop regardless.
 - **Fresh context per step, pure standalone skills.** Only `setup` and the `continue` base skill (the
   sole driver) know the tree/IDs/storage/chaining; every other skill is a **pure transform** that takes
@@ -38,14 +39,36 @@ this repo), then from your project root:
    Two ways to drive it:
    - **Manual** — invoke `/continue` yourself, review at each gate, invoke it again for the next step.
      You stay in control step by step.
-   - **Unattended (Ralph loop)** — run [`skills/continue/loop.sh`](skills/continue/loop.sh) once from a
-     terminal. It relaunches `/continue` as a **brand-new process per step**, so context is zeroed each
-     time; `index.md` is the only memory carried across. It honors `gatePolicy`, and the safety gates
-     still halt the loop for a human (via `.sdlc/loop-control`). Step cap = `execution.maxSteps`
-     (override with `MAX_STEPS=…`).
+   - **Looped (Ralph loop)** — run [`skills/continue/loop.sh`](skills/continue/loop.sh) once from a
+     terminal. It relaunches `/continue` as a **brand-new interactive process per step** — full TUI,
+     normal permissions, the gate picker all work — so context is zeroed each time; `index.md` is the
+     only memory carried across. You end each step's session when it's done and the loop asks whether to
+     go on (its only stop control). It honors `gatePolicy` for which gates present a picker; the safety
+     gates always pause regardless. Step cap = `execution.maxSteps` (override with `MAX_STEPS=…`).
+     - **Unattended** — add `--headless` (`loop.sh --headless`) to run it hands-off: each step uses
+       `claude -p`, which **auto-exits**, and the loop **auto-advances** with no prompts. There's no
+       interactive picker, so the driver signals via text sentinels (it stops only at safety/`pause`
+       gates, exits when the project is complete). Pair with `gatePolicy: auto`.
 
 Every skill is also directly invocable on its own for one-off use. See
 [`continue`](skills/continue) for the structure, settings schema, and chaining rules.
+
+## Resume, jump, and refine
+
+- **`continue` is a pointer into the artifact tree.** It carries no state of its own — it reads
+  `index.md`'s live status dashboard to find exactly **where you left off**: which phase, and for
+  `implement` which `REQ`/`TASK` item. It then runs that one next step and stops. This is the feature
+  that makes the conversation disposable: pick the project up days later (or in a fresh process) and
+  `continue` always knows the resume point, because the tree — not the chat — is the memory.
+- **Jump to any phase with a single skill.** Because every phase skill is a pure transform, you don't
+  have to go through `continue`. Invoke a skill directly (e.g. `/design`, `/specify`) to **jump back**
+  and re-do an earlier phase for a document whenever you want; re-entering a phase updates that phase's
+  artifact in place (one source of truth, no fork).
+- **Refine a phase in a loop until satisfied.** Every phase ends at its gate offering **Approve**
+  (continue to the next phase) · **Request changes** (refine — note what to change; it **re-runs the
+  same phase in place**) · **Stop here**. Choosing *Request changes* repeatedly lets you iterate one
+  phase on one document — tighten a spec, a design, a task set — looping over the same step until it's
+  right, before advancing.
 
 ## The loop
 
@@ -59,8 +82,8 @@ postures invoked from within phases: interview · doubt · incremental
 ```
 
 Every `→` is a human gate. The driver `continue` runs the next step — one phase, or one `implement`
-task — and **stops** at its gate; for unattended runs the `skills/continue/loop.sh` fresh-process loop
-relaunches it per step (each in a new session), respecting `gatePolicy` for which gates still halt.
+task — and **stops** at its gate; the `skills/continue/loop.sh` fresh-process loop relaunches it per step
+(each a fresh interactive session), respecting `gatePolicy` for which gates present a picker.
 
 ## Skills
 
@@ -102,7 +125,7 @@ Folder name = the skill's `name`.
 ### Driver
 | Skill | Role |
 |---|---|
-| [`continue`](skills/continue) | **base skill** and sole driver — defines the structure (artifact tree, storage, invariants, bootstrap, phase graph), loaded whenever working in the system; runs the **next single step** (one phase, or one `implement` task) and stops at its gate. Its [`loop.sh`](skills/continue/loop.sh) relaunches it per step for unattended full-loop runs |
+| [`continue`](skills/continue) | **base skill** and sole driver — defines the structure (artifact tree, storage, invariants, bootstrap, phase graph), loaded whenever working in the system; runs the **next single step** (one phase, or one `implement` task) and stops at its gate. Its [`loop.sh`](skills/continue/loop.sh) relaunches it as a fresh interactive session per step for full-loop runs |
 
 ## Generated file tree
 

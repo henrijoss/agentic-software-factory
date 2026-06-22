@@ -7,16 +7,16 @@ phase we're in, what it operates on, where it sits in the loop, and exactly what
 ## Scope (read first)
 
 - **The driver owns this framing.** Only `continue` emits it — it is the only actor
-  that knows loop position, the artifact identity (which `[REQ-n]`/`[TASK-m]`), the resolved gate
-  decision, and whether the session is interactive. **Phase/transition skills never emit it** — they
+  that knows loop position, the artifact identity (which `[REQ-n]`/`[TASK-m]`), and the resolved gate
+  decision (pause vs. advance). **Phase/transition skills never emit it** — they
   are pure transforms that return a result the driver frames.
-- **Interactive mode only.** In **non-interactive / headless mode** (`claude -p`, `skills/continue/loop.sh`)
-  there is no human to read a banner or act on a call-to-action: the driver writes `.sdlc/loop-control`
-  (`continue` / `halt: <reason>` / `done`) as defined in `fresh-context.md` and emits **none** of the
-  banners, maps, saved confirmations, gate blocks, pickers, or footers below — and never invokes an
-  interactive picker. The headless `── step N ──` banner that `loop.sh`
-  prints is the headless framing and is deliberately a **light** rule so it never collides with the
-  interactive **heavy** phase-start banner.
+- **Every step is interactive.** The driver always emits this framing — banners, maps, saved
+  confirmations, and, at a **pause** gate, the gate block + picker/footer. The only variation is the
+  gate hand-off: `gatePolicy` (via the gate-autonomy precedence in `fresh-context.md`) decides whether a
+  gate **pauses** (present the decision) or **advances** (skip the picker/gate block and end on the saved
+  confirmation). The `── step N ──` banner is printed by `loop.sh` itself between steps — not by the
+  driver — and is deliberately a **light** rule so it never collides with the **heavy** phase-start
+  banner the driver emits inside the step.
 
 ## The four elements
 
@@ -41,7 +41,8 @@ Emitted **once**, at the top of the message in which a phase begins.
   - a phase with no single artifact (`constitution`, `specify` on a fresh project) → `▶ project · <slice name>`
 - The third line states what the phase produces, in one clause.
 - The **heavy** `━` rule is what distinguishes phase-start from the gate block (light `─`, below) and
-  the headless `── step N ──` banner — the weight contrast signals open-vs-close without relying on color.
+  the `── step N ──` banner `loop.sh` prints between steps — the weight contrast signals open-vs-close
+  without relying on color.
 
 ### 2. Phase map — vertical checklist (heavy rule's companion)
 
@@ -124,8 +125,17 @@ paragraph the operator must read and answer by typing — which was the whole po
 2. **No picker in the harness** → fall back to the **`── NEXT ──` text footer** (templates below): a final
    light-rule block, `→`-prefixed options, each with an `— …` consequence clause. The operator types
    their choice. Behavior is otherwise identical.
-3. **Headless / non-interactive** → no picker, no footer; write `.sdlc/loop-control` (`continue` /
-   `halt: <reason>` / `done`) per `fresh-context.md`.
+3. **No human present (headless `claude -p`, e.g. `loop.sh --headless`)** → there is no one to pick or
+   type, so emit a **text sentinel** on the message's last line instead of a picker/footer: a **pause**
+   or safety-floor gate emits `<sdlc-gate>PAUSE: <reason></sdlc-gate>` and stops; an **advance** gate
+   emits no hand-off at all (the saved confirmation is the final block); and when there is no next step
+   the driver emits `<sdlc-done>COMPLETE</sdlc-done>`. The loop reads these to stop or auto-advance — the
+   full contract is in `fresh-context.md`. (Headless runs under `gatePolicy: auto`, so routine gates
+   advance silently and only the safety floor / a `pause` override trips the sentinel.)
+
+This ladder applies at a **pause** gate. At an **advance** gate (`gatePolicy` resolved the gate to
+auto-advance — see `fresh-context.md`) there is **no** hand-off at all: the saved confirmation is the
+final block and the step ends. The safety-floor gates always pause, so they always reach the ladder.
 
 **Picker option sets (gate-specific).** A picker holds ~4 explicit options plus an always-available
 free-text "Other"; where space is tight the feedback/changes path rides the note/"Other" rather than
@@ -222,12 +232,11 @@ Next draft requirement: REQ-03 · digest scheduling.
   full form when the session ends here (the normal case), compact one-line form when the operator runs
   `continue` again in the same interactive session. Emitted only after gate-validation **passes**; on
   failure surface the validation error, not a "saved" claim.
-- **Gate decision + hand-off (picker or footer):** once, at the gate the step stops on. Interactive
-  `continue` runs a single step and always presents that step's gate, so the hand-off appears wherever
-  the operator owes a decision. The exception is a finished `implement` task with **more tasks
-  remaining** — that is not a gate: emit the saved confirmation and a plain "next: `[REQ-n.TASK-m]`"
-  pointer (no picker), since the only thing to do is run the next task. (`gatePolicy` auto-advance is a
-  headless concept — it never applies in interactive mode, which has no in-session multi-step walk.)
+- **Gate decision + hand-off (picker or footer):** once, at a **pause** gate the step stops on, wherever
+  the operator owes a decision. At an **advance** gate (`gatePolicy` resolved it to auto-advance) emit no
+  hand-off — the saved confirmation is the final block. A finished `implement` task with **more tasks
+  remaining** is likewise not a gate: emit the saved confirmation and a plain "next: `[REQ-n.TASK-m]`"
+  pointer (no picker), since the only thing to do is run the next task.
 - **Mid-phase work** (the phase doing its work, tool calls, reasoning) carries **no** banners, maps, or
   hand-offs — they are phase-boundary furniture only.
 
@@ -256,7 +265,7 @@ All glyphs are already in use in this repo — keep them consistent.
 | Glyph | Meaning | Where it already appears |
 |---|---|---|
 | `━` | interactive **phase-start** banner (heavy rule) | new here (heavy weight reserved for phase-start) |
-| `─` | saved / gate / closing block & `NEXT` footer; also the headless `── step N ──` step banner | `fresh-context.md` step banner |
+| `─` | saved / gate / closing block & `NEXT` footer; also the `── step N ──` banner `loop.sh` prints between steps | `fresh-context.md` step banner |
 | `✓` | done / passed / **saved (artifact written)** | `deploy-guide.md` pre-ship checklist |
 | `▶` | current phase / active artifact | README loop diagram |
 | `·` | pending phase (in the compact bar) / separator | repo-wide separator |

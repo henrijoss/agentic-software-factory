@@ -1,6 +1,6 @@
 ---
 name: continue
-description: The base skill of the SDLC skillset — load it whenever you work within this system. It defines the artifact tree, stable IDs, storage, the tree's structural invariants, gate-validation, and tree-root bootstrap, plus the canonical phase graph. As the sole driver it reads where the project left off from `index.md`, runs the next single step — one phase, or one `implement` task — and stops at its gate. Use to resume/continue a project ("where did we leave off", "do the next step") or whenever a phase skill needs the structure and storage rules. For unattended full-loop automation, the fresh-process loop (`loop.sh`) repeatedly invokes it — one fresh session per step.
+description: The base skill of the SDLC skillset — load it whenever you work within this system. It defines the artifact tree, stable IDs, storage, the tree's structural invariants, gate-validation, and tree-root bootstrap, plus the canonical phase graph. As the sole driver it reads where the project left off from `index.md`, runs the next single step — one phase, or one `implement` task — and stops at its gate. Use to resume/continue a project ("where did we leave off", "do the next step") or whenever a phase skill needs the structure and storage rules. To walk the whole loop, the fresh-process loop (`loop.sh`) relaunches it in a fresh interactive session per step.
 ---
 
 # Continue (base skill)
@@ -12,8 +12,8 @@ is the single place that defines *how artifacts are stored and structured* and *
 sequenced*. It is also the **sole driver** — it reads `index.md` to see where the project stands,
 runs the **next single step** (one phase, or one `implement` task), and stops at that step's human gate.
 The operator stays in control step by step. There is no in-session multi-step driver: to walk the whole
-loop unattended, the fresh-process loop (`loop.sh`, see `references/fresh-context.md`) relaunches this
-skill in a brand-new session for each step, so context is zeroed between steps instead of growing.
+loop, the fresh-process loop (`loop.sh`, see `references/fresh-context.md`) relaunches this skill in a
+brand-new interactive session for each step, so context is zeroed between steps instead of growing.
 
 Every other skill is a **pure, system-agnostic transform** — it knows nothing of the tree, `index.md`,
 IDs, storage, or chaining; it takes the inputs the driver provides and **emits a result** (the result
@@ -26,11 +26,11 @@ in `references/` and is loaded on demand.
 
 Each step is **self-contained**: it resumes from `index.md` and ends by writing its result back to the
 tree. The conversation is disposable — once a step is ingested, `index.md` holds everything the next
-step needs, so the next step can (and for long unattended runs, should) start from a **completely
+step needs, so the next step can (and for long looped runs, should) start from a **completely
 fresh context**. A step is one phase, except in `implement`, where each step is a **single task** — so a
 slice's `implement` phase spans as many steps as it has tasks, each a fresh session.
-`references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and the non-interactive
-loop-control contract below.
+`references/fresh-context.md` covers the fresh-process loop (`loop.sh`) and how `gatePolicy` resolves
+each gate in-session below.
 
 ## Skillset version
 
@@ -57,8 +57,8 @@ session start (see the **version-compat check** in Process).
 
 - As a phase itself — it owns no phase artifact; it sequences phases and defines the structure.
 
-For unattended full-loop automation across many steps, you still use `continue` — the fresh-process loop
-(`loop.sh`) just relaunches it per step. There is no separate full-loop driver.
+For a looped run across many steps, you still use `continue` — the fresh-process loop (`loop.sh`) just
+relaunches it interactively per step. There is no separate full-loop driver.
 
 ## Artifact tree & storage (local files, versioned with code)
 
@@ -162,20 +162,22 @@ a phase is passed to it as a plain input by the driver (see `references/handoff.
 only the driver consults it; phase skills never see it (like every other setting). At each gate the
 driver resolves *pause vs. advance* by this precedence:
 
-1. **Safety floor first — always pause/halt, ignoring policy and overrides:** `deploy` or any
+1. **Safety floor first — always pause, ignoring policy and overrides:** `deploy` or any
    outward/irreversible action (ship authorization); a held **sync gate** (external drift); **failed
    gate-validation** (dangling/duplicate/orphan/unreachable); an **ambiguous** next phase; a **major**
-   version mismatch. These are the same gates that `halt` headlessly — autonomy can never skip them.
+   version mismatch. Autonomy can never skip these.
 2. Else if `gateOverrides[<phase>]` is set → use it (`pause` or `auto`).
 3. Else apply `gatePolicy`: `manual` → pause; `auto` → advance; `milestones` → pause iff the phase is a
    **milestone gate** (`constitution`, `specify`, `design`, `review` — the direction-defining,
    costly-to-reverse decisions), else advance.
 
-This resolution only applies **headless** (under the `loop.sh` loop): a resolved **pause** writes
-`halt`, a resolved **advance** writes `continue`. **Interactive `continue` is single-step** — it always
-presents the gate and stops, regardless of `gatePolicy` (the operator is the loop). Either way the gate
-and its **gate-validation still run on every transition**; `gatePolicy` only relaxes the human prompt at
-a *routine* gate in the headless loop.
+`continue` always runs **interactively**, so this resolution decides only whether a gate **presents its
+decision picker** before the step ends: a resolved **pause** poses the gate's specific decision to the
+operator (the picker, or the `── NEXT ──` text footer); a resolved **advance** skips the picker, records
+the gate outcome, and ends the step on the saved confirmation alone. Every step ends after one phase
+either way — sequencing the next step is the `loop.sh` loop's job (which prompts the operator between
+steps), never an in-session walk. The gate and its **gate-validation still run on every transition**;
+`gatePolicy` only relaxes the *human prompt* at a *routine* gate.
 
 **`gatePolicy` and `traversal` are orthogonal.** `gatePolicy` resolves *pause vs. advance*; `traversal`
 (`execution.traversal`) only chooses, **once a gate has resolved to advance**, the advance *target* —
@@ -273,7 +275,7 @@ Then read `settings.json` and run the **version-compat check** — compare its `
 against `SDLC_SKILLSET_VERSION` (running `R`), as `major.minor.patch`:
 
 - **`R.major != S.major`** → **halt**: incompatible tree structure; require an explicit
-  migration/override decision before any phase runs. (Headless: `halt: version mismatch <S> vs <R>`.)
+  migration/override decision before any phase runs (a safety-floor gate — always pauses for the human).
 - **same major, `R > S`** (running newer) → proceed, and **bump** `settings.version` to `R` (record the
   forward migration).
 - **same major, `R < S`** (running older than the tree) → **warn** and proceed (same major = compatible
@@ -341,6 +343,11 @@ node** (the implement→verify gate). When the next runnable task is `blocked` o
 an unmet dependency, that is a safety-floor **halt** for a human. This per-task granularity is what gives
 each task a fresh session under the `loop.sh` loop.
 
+**No next step.** If the project has nothing left to run — all slices complete through their terminal
+phase and no queued maintenance — there is no step to take. In an interactive run say so and stop; in a
+**headless** run (below) emit the completion sentinel `<sdlc-done>COMPLETE</sdlc-done>` rather than
+inventing work, so the loop exits cleanly.
+
 ### 5. Assemble inputs, then run exactly one phase
 
 **Assemble** the phase's inputs from the tree (`[CONST]`, the prior artifact on re-entry, the chosen
@@ -358,11 +365,13 @@ write to the tree path (artifact-io), updating **in place** on re-entry (never f
 `index.md` → clear `.sdlc/scratch/`. For an `implement` step, ingest also updates the just-finished
 **task's status** in `index.md` (`done`, or `blocked`) alongside the SessionSummary it wrote. For a
 `to-tasks` step, the requirement's status becomes `tasks ready`, or `tasks ready · deferred` when the
-gate resolves to defer implement (interactive **Clarify next requirement**, or headless
-`requirements-first` while a draft requirement still remains). Run
-**gate-validation** (dangling / duplicate / orphan / unreachable → fail and surface). Present the
-step's specific gate decision (never "looks good?"). **Stop** — the session ends here. The operator
-runs `continue` again for the next step, or the `loop.sh` loop relaunches it in a fresh session.
+gate resolves to defer implement (the **Clarify next requirement** pick, or `traversal:
+requirements-first` while a draft requirement still remains). Run
+**gate-validation** (dangling / duplicate / orphan / unreachable → fail and surface). Resolve the gate
+via the **gate-autonomy precedence** above: at a **pause** gate, present the step's specific decision to
+the operator (never "looks good?"); at an **advance** gate, skip the picker and end on the saved
+confirmation. **Stop** — the session ends here either way. The operator runs `continue` again for the
+next step, or the `loop.sh` loop relaunches it in a fresh session and prompts whether to go on.
 Advancing across steps is the external loop's job, never an in-session walk.
 
 **A finished `implement` task that is not the last one is not a gate.** When tasks remain in the slice,
@@ -371,16 +380,17 @@ there is no phase transition yet — the next step is simply the next task. Do *
 following fresh session. Only the **last** task completing reaches the implement→verify gate, which then
 resolves via the gate-autonomy precedence like any other transition.
 
-**Interactive framing (presentation contract).** When a human is present, frame the output per
+**Interactive framing (presentation contract).** Every step is interactive — frame the output per
 `references/presentation.md`: at phase entry emit a **phase-start banner** (`━━━ PHASE N/11 · <phase> ━━━`
 + the `[REQ-n]`/`[TASK-m]` it operates on) followed once by the **vertical phase map** (✓ done · ▶
-current · pending); at the gate emit a **`── <phase> complete · GATE ──`** block carrying this gate's
-specific decision question. On a **successful ingest** (artifact written, `index.md` updated,
+current · pending); at a **pause** gate emit a **`── <phase> complete · GATE ──`** block carrying this
+gate's specific decision question (at an **advance** gate the saved confirmation is the final block — no
+gate block, no picker). On a **successful ingest** (artifact written, `index.md` updated,
 gate-validation passed) emit a **saved confirmation** — the artifact(s) by `<ID> → <path>` plus
 `index.md`, and a "Safe to clear or close — `index.md` holds the state; resume with /continue" line — so
 the operator knows the tree is persisted and the session is disposable. Only claim "saved" **after**
-gate-validation passes; on failure surface the failure instead. Then **hand the decision to the
-operator** as the **last** thing in the message. Prefer an **interactive selection picker** (the
+gate-validation passes; on failure surface the failure instead. At a **pause** gate, **hand the decision
+to the operator** as the **last** thing in the message. Prefer an **interactive selection picker** (the
 harness's question tool — in Claude Code,
 `AskUserQuestion`) so it is unmistakably their turn: Approve / Request changes (with a note for what to
 change) / Stop, or the gate's variant (verify/test → test/verify/both/Skip; deploy → Authorize ship/Hold;
@@ -392,32 +402,35 @@ back to the **`── NEXT ──`** text footer with the same options. Banners/
 mid-phase. The reference holds the literal templates, the picker option sets, and the narrow-terminal
 degradation ladder.
 
-**Non-interactive mode (headless / fresh-process loop).** When run via `claude -p` (no human to answer
-the gate — e.g. driven by `skills/continue/loop.sh`), do not pause. After ingest + gate-validation,
-write `.sdlc/loop-control` with exactly one of: `continue` (advance), `halt: <reason>` (a human is
-required), or `done` (the slice/loop is complete). Resolve which to write via the **gate-autonomy
-precedence** above: the **safety floor always `halt`s** — an ambiguous next step, a held **sync gate**
-(external drift), `deploy` or any outward/irreversible authorization, failed gate-validation, a major
-version mismatch, or a decision the phase would otherwise have to guess; otherwise a resolved **pause**
-(from `gateOverrides` or `gatePolicy`) writes `halt: gate <phase> — gatePolicy=<policy>`, and a resolved
-**advance** writes `continue`. A finished `implement` task with **more tasks remaining** is not a gate —
-write `continue` unconditionally (only the safety floor can override); the next fresh session picks the
-next task. At a `to-tasks → implement` gate that resolves to **advance**, `execution.traversal` picks the
-target: `depth-first` writes `continue` (the next session implements this slice); `requirements-first`
-marks the requirement `tasks ready · deferred` and also writes `continue` — the next session, finding no
-non-deferred ready slice, clarifies the next draft requirement (Step 4), and once no draft remains drains
-`implement` in priority order. Either way it is a plain `continue`; the deferral lives in the persisted
-status, not the loop-control verb. This is how the human-gate-on-every-transition rule holds without a human in the loop — and
-how `gatePolicy` tunes which routine gates still stop. Full contract and the `halt` cases:
-`references/fresh-context.md`. Headless emits the loop-control file and **none** of the interactive
-presentation furniture (banners, maps, gate blocks, `NEXT` footers) — those are interactive-only
-(`references/presentation.md`).
+**Gate resolution (pause vs. advance).** After ingest + gate-validation, resolve the gate via the
+**gate-autonomy precedence** above. A resolved **pause** presents the decision (picker / `── NEXT ──`
+footer) and the step ends on the operator's choice; a resolved **advance** skips the picker, ends on the
+saved confirmation, and the next fresh session simply moves on. The **safety floor always pauses** — an
+ambiguous next step, a held **sync gate** (external drift), `deploy` or any outward/irreversible
+authorization, failed gate-validation, a major version mismatch, or a decision the phase would otherwise
+have to guess. A finished `implement` task with **more tasks remaining** is not a gate — end the step
+and let the next fresh session pick the next task (only the safety floor can interrupt). At a
+`to-tasks → implement` gate that resolves to **advance**, `execution.traversal` picks the target:
+`depth-first` proceeds to implement this slice next; `requirements-first` marks the requirement
+`tasks ready · deferred` so the next session, finding no non-deferred ready slice, clarifies the next
+draft requirement (Step 4), and once no draft remains drains `implement` in priority order. The deferral
+lives in the persisted status. This is how the human-gate-on-every-transition rule holds while
+`gatePolicy` tunes which routine gates still pause. The `loop.sh` loop sequences steps and prompts the
+operator between them (`references/fresh-context.md`); it writes no control file.
+
+**Headless (no interactive picker).** Under `loop.sh --headless` each step runs `claude -p`, which has no
+picker, so the hand-off degrades to a **text sentinel** on the step's last line (the contract and table
+live in `references/fresh-context.md`): an **advance** gate ends on the saved confirmation as usual; a
+**pause** or **safety-floor** gate emits `<sdlc-gate>PAUSE: <reason></sdlc-gate>` and stops for the human
+instead of presenting the picker; and when Step 4 finds no next step the driver emits
+`<sdlc-done>COMPLETE</sdlc-done>`. Headless assumes `gatePolicy: auto` so only the safety floor (and any
+`pause` override) interrupts an otherwise unattended run.
 
 ## Composability (big↔small)
 
 A typo just runs `implement`. A single requirement enters at `design`. A whole product walks the loop
-one `continue` step at a time — interactively, or unattended via the `loop.sh` fresh-process loop that
-relaunches `continue` per step. Only the phases and tree levels a job needs ever materialize.
+one `continue` step at a time — by hand, or via the `loop.sh` fresh-process loop that relaunches
+`continue` interactively per step. Only the phases and tree levels a job needs ever materialize.
 
 ## Red Flags
 
@@ -430,9 +443,9 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
   root by discovery.
 - Forking a duplicate artifact on re-entry instead of updating in place.
 - A "looks good?" gate with nothing to decide.
-- Emitting the interactive presentation furniture (phase-start banner, phase map, saved confirmation,
-  gate block, picker / `NEXT` footer) in headless mode, or burying the hand-off above other content
-  instead of as the message's final block.
+- Emitting the gate block / picker / `NEXT` footer at an **advance** gate (it skips the picker and ends
+  on the saved confirmation), or burying the hand-off above other content instead of as the message's
+  final block.
 - Claiming "saved / safe to clear" before ingest + gate-validation actually completed, or omitting the
   saved confirmation entirely so the operator can't tell the tree was written and the session is
   disposable. Explaining the gate in prose and stopping when an interactive picker was
@@ -442,12 +455,10 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
 - Skipping the sync check, or treating the equality test as a correctness gate instead of examining the
   `recorded..HEAD` diff to reconcile.
 - Blocking a phase when there is no git repo/`HEAD` — the sync check degrades to no-drift, never blocks.
-- In non-interactive mode, writing `continue` to `.sdlc/loop-control` for a `halt`-worthy gate (sync
-  drift, `deploy`/irreversible, ambiguous next phase, failed validation) — that auto-advances past a
-  decision a human owes. When in doubt, `halt`.
-- Auto-advancing a **safety-floor** gate because `gatePolicy` is `auto`/`milestones` (or a
-  `gateOverrides` entry says `auto`) — the floor (`deploy`/irreversible, sync drift, failed validation,
-  ambiguous phase, major version mismatch) always stops, policy notwithstanding.
+- Auto-advancing (skipping the picker at) a **safety-floor** gate because `gatePolicy` is
+  `auto`/`milestones` (or a `gateOverrides` entry says `auto`) — the floor (`deploy`/irreversible, sync
+  drift, failed validation, ambiguous phase, major version mismatch) always pauses, policy
+  notwithstanding. When in doubt, pause.
 - Treating `gatePolicy` as a license to **skip a gate or its gate-validation** — it only relaxes the
   *human prompt* at a routine gate; the gate and its validation still run on every transition.
 - Deferring `implement` to clarify the next requirement under `depth-first` (deferral is opt-in:
@@ -471,7 +482,7 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
       as a phase input, `gatePolicy`/`gateOverrides` resolved each gate's pause-vs-advance — no phase
       skill read `settings.json`.
 - [ ] Gate autonomy honored the precedence (safety floor → `gateOverrides` → `gatePolicy`): the safety
-      floor still paused/`halt`ed under every policy; only routine gates auto-advanced.
+      floor still paused (presented its picker) under every policy; only routine gates auto-advanced.
 - [ ] Status dashboard read; the single next step chosen from the phase graph — one phase, or, inside
       `implement`, the next non-`done` task whose dependencies are met (or one-off deferred).
 - [ ] `traversal` honored at the `to-tasks → implement` gate: `depth-first` advanced to `implement`;
@@ -486,9 +497,9 @@ relaunches `continue` per step. Only the phases and tree levels a job needs ever
       with no in-session advance to the next step.
 - [ ] Result **ingested**: ID resolved, written to the tree, `index.md` registered/updated,
       `.sdlc/scratch/` cleared; for an `implement` step, the finished task's status set to `done`/`blocked`.
-- [ ] Gate-validation run; the phase's real decision posed (interactive), or `.sdlc/loop-control`
-      written with `continue`/`halt: <reason>`/`done` (non-interactive) — `halt` for any gate owing a
-      human decision.
+- [ ] Gate-validation run; at a pause gate the phase's real decision posed (picker / `NEXT` footer); at
+      an advance gate the picker skipped and the step ended on the saved confirmation — any gate owing a
+      human decision (safety floor) paused regardless of policy.
 - [ ] Re-entry updated artifacts in place — no duplicate fork.
 - [ ] The step resumed from `index.md` and ended by writing its result back — self-contained, so the
       next step can start from a fresh context.
