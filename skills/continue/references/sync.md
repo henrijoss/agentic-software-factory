@@ -69,8 +69,9 @@ On real drift, hold a gate like any other — surface the **decision**, never "l
 > the design assumption in `[REQ-…]`. Which open work do you want to mark resolved, re-confirm, or
 > re-open — and what re-enters the loop?
 
-Under the `loop.sh` loop, this gate holds like every other safety-floor gate: it always **pauses** for
-the operator — no auto-advance past unresolved drift, whatever the `gatePolicy`.
+Under the `loop.sh` loop, drift reconciliation always **stops** for the operator — `auto` never
+auto-advances past unresolved drift; reconciling external drift is a correctness check, not a routine
+hand-off.
 
 ## Reconciliation routing
 

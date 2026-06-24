@@ -19,6 +19,10 @@ repeats the constitution is mis-scoped.
 The unit is a **vertical slice / use-case**, not the whole product (loop principle 2). The first
 slice's spec is written from scratch; later slices re-enter and revise it.
 
+`spec.md` is a **living spec**: re-entered freely **before and after** implementation, always updated
+**in place**, never "closed" or "done". When code teaches something the spec got wrong, come back and
+revise it — the spec tracks the slice for its whole life, not just up to the first implementation.
+
 ## When to Use
 
 - Starting a slice when only a vague idea or feature request exists.

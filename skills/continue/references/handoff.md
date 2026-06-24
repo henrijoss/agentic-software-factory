@@ -21,7 +21,7 @@ assigns those. `slug` and `gate` are hints/intrinsics the transform owns.
 
 ```
 ---
-artifact: <abstract noun>       # Specification | Plan | Requirement | Task | Stakeholder | SessionSummary | DeployRecord | MaintenanceItem | Constitution
+artifact: <abstract noun>       # Specification | Plan | Requirement | Task | Stakeholder | DeployRecord | MaintenanceItem | Constitution
 slug: <suggested-kebab-title>   # naming hint only; the driver assigns the real stable ID
 gate: "<intrinsic decision question>"   # e.g. "Is the objective/scope/success right and ready to fan out?"
 assumptions: [ ... ]            # surfaced assumptions / open questions (optional)
@@ -67,13 +67,12 @@ Steps:
    binding table). **In-place update / no-fork:** re-entry overwrites the existing file;
    never create a parallel copy. New fan-out artifacts create their dir + file.
 4. **Register.** Add/update the ID → path row and the status in `index.md` (tree map +
-   ID registry + status dashboard). An **`implement`** ingest touches **two** rows: it
-   writes the `[REQ-n.SESSION]` SessionSummary in place **and** sets the just-finished
+   ID registry + status dashboard). An **`implement`** ingest sets the just-finished
    `[REQ-n.TASK-m]` status (`done`, or `blocked`) — the per-task status the next step reads
-   to pick the next task. A **`to-tasks`** ingest sets the requirement's status to `tasks ready`,
-   or `tasks ready · deferred` when the gate resolved to defer implement (the
-   *Clarify next requirement* pick, or `traversal: requirements-first` with a draft requirement still
-   remaining) — the marker the next step's traversal reads (`SKILL.md` Step 4).
+   to pick the next task — and updates the **Last worked / Suggested next** status lines.
+   There is no separate handoff file; the per-slice handoff is carried by those status lines
+   plus the recent git commits. A **`to-tasks`** ingest sets the requirement's status to
+   `tasks ready`.
 5. **Gate-validate.** Run the structural validation (dangling / duplicate / orphan /
    unreachable → fail and surface). A `to-*` fan-out registers **all** produced artifacts
    before validating.
@@ -87,6 +86,15 @@ Steps:
 
 The in-place-update and gate-validation invariants live here in the driver — phase
 skills no longer restate them.
+
+**Finish-cleanup (driver-only, not a phase ingest).** When a requirement is confirmed
+**finished** (see *Finishing a requirement* in the `continue` base skill), the driver
+**deletes** the ephemeral scaffolding — `requirements/REQ-n/design.md` and
+`requirements/REQ-n/tasks/` — **removes** their IDs (`[REQ-n.DESIGN]`, `[REQ-n.TASK-m]`)
+from the `index.md` registry **and** tree map, and **keeps** `requirement.md` (a durable
+living spec). Gate-validation runs afterward so no removed ID is left dangling and no
+artifact is orphaned. The durable record of the deleted design/tasks lives in git and is
+recoverable (`git log`/`git show` — see `references/artifact-io.md`).
 
 ## 3. Input-assembly (driver-only — runs before the transform)
 
@@ -103,7 +111,7 @@ which phase comes from the **consumed-by** column of the artifact table in
 | `clarify` | one draft `[REQ-n]`, `[CONST]` |
 | `design` | one `[REQ-n]`, `[CONST]`; prior `[REQ-n.DESIGN]` on re-entry (code read live by the skill itself) |
 | `to-tasks` | `[REQ-n.DESIGN]`, `[CONST]` |
-| `implement` | the **single** next `[REQ-n.TASK-m]` (lowest non-`done` task whose deps are met — driver-selected), prior `[REQ-n.SESSION]`, `[CONST]` |
+| `implement` | the **single** next `[REQ-n.TASK-m]` (lowest non-`done` task whose deps are met — driver-selected), `[CONST]`; the cross-step handoff (`index.md`'s Last worked / Suggested next + the last few commits) as context |
 | `verify`/`test` | the change + the slice's `[REQ-n]`/tasks |
 | `review` | the implemented slice, `[STK-n]`, `[CONST]` |
 | `deploy` | the reviewed change, `[CONST]` |

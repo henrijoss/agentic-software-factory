@@ -1,7 +1,7 @@
 # Continue — Fresh-Context Step Loop (depth)
 
-Loaded on demand by the `continue` base skill. The SKILL.md core states how `gatePolicy` resolves each
-gate in-session; the rationale, the reset options, and `loop.sh` usage live here.
+Loaded on demand by the `continue` base skill. The SKILL.md core states how the `auto` switch resolves
+each step's end-of-step hand-off; the rationale, the reset options, and `loop.sh` usage live here.
 
 ## Why fresh context per step
 
@@ -32,33 +32,24 @@ Three ways to "reset" between steps, only one of which actually zeroes the trans
 `skills/continue/loop.sh` implements option 3 — the standard way to walk the whole loop (option 2 is the
 hand-driven single-step equivalent; the agent cannot relaunch itself, so the loop lives in the script,
 launched once from a terminal). It runs each step as a normal interactive session — full TUI, normal
-permissions, the gate picker all work exactly as in a hand-run `continue`.
+permissions, the interactive end-of-step hand-off all work exactly as in a hand-run `continue`.
 
-## How `gatePolicy` resolves each gate (in-session)
+## How `auto` resolves each step's hand-off (in-session)
 
-Every step runs interactively, so `gatePolicy` decides only whether a gate **presents its decision
-picker** before the step ends — it never writes a control file. After ingest + gate-validation, the
-driver resolves the gate by the base skill's gate-autonomy precedence (safety floor →
-`gateOverrides[<phase>]` → `gatePolicy`):
+Every step runs interactively, so `auto` decides only whether the step **presents its end-of-step
+hand-off** before ending — it never writes a control file. After ingest + gate-validation:
 
-| Resolved decision | What the step does |
+| `auto` | What the step does |
 |---|---|
-| Safety floor (always) | Present the decision — the operator must answer (picker / `── NEXT ──` footer). |
-| `pause` — `manual`, a milestone gate under `milestones`, or a `pause` override | Present the decision. |
-| `advance` — `auto`, a non-milestone gate under `milestones`, or an `auto` override | Skip the picker; end on the saved confirmation. |
+| `false` (default) | Present the interactive end-of-step hand-off (`references/presentation.md`); the operator picks the next move. |
+| `true` | Skip the questions; end on the saved confirmation and let the next fresh session auto-take the suggested next step. |
 
-**The safety floor always pauses, whatever the policy:** an ambiguous gate where the next phase isn't
-unambiguous; a **sync gate** holding external drift (`HEAD` != `Last synced commit`); `deploy` or any
-outward/irreversible action needing its own authorization; failed gate-validation
-(dangling/duplicate/orphan/unreachable); a major version mismatch; a rejected/uncertain decision a phase
-would otherwise guess.
-
-So `gatePolicy: manual` presents a picker at every gate (the operator decides each one), `auto` skips
-every routine picker (only the safety floor pauses), and `milestones` presents only at the milestone
-gates (`constitution`/`specify`/`design`/`review`) plus the floor. This preserves "a human gate on every
-transition" — the gate and its validation still run each step; `gatePolicy` only tunes which routine
-gates pause for the picker. Either way the step ends after one phase; `loop.sh` is what relaunches the
-next one and asks the operator whether to go on.
+`auto` removes **only the human prompt** — never a correctness check. These always run and always
+halt/surface, whatever `auto` is: failed gate-validation (dangling/duplicate/orphan/unreachable), a held
+**sync gate** holding external drift (`HEAD` != `Last synced commit`), and a major version mismatch.
+`auto: true` is for unattended runs; `auto: false` keeps the operator in the loop step by step. Either
+way the step ends after one phase; `loop.sh` relaunches the next one (and, under `auto: false`, asks the
+operator whether to go on).
 
 ## Running the loop
 
@@ -66,53 +57,46 @@ next one and asks the operator whether to go on.
 # from the project root (where docs/<root>/ lives):
 skills/continue/loop.sh                  # drives /continue, up to MAX_STEPS (default 50)
 skills/continue/loop.sh "/some-prompt"   # drive a different prompt/skill
+skills/continue/loop.sh --auto           # unattended: auto-advance every step
 MAX_STEPS=100 skills/continue/loop.sh    # go further
 ```
 
-Each iteration prints a `── step N ──` banner, then launches a fresh **interactive** `claude` running
-the step — full TUI, normal permissions, working gate picker. An interactive session does not auto-exit,
-so you end it (Ctrl-D / `/exit` / **Stop here** at the gate) when the step is done; the loop then asks
-`run the next step? [Y/n]` — Enter/`y` continues, `n`/`q` stops. **That between-step prompt is the loop's
-only stop control** (there is no `.sdlc/loop-control` file). The script changes nothing about the
-artifact tree itself; it only sequences cold processes.
+Each iteration prints a `── step N ──` banner, then **assembles the fresh step's context** and launches
+a cold `claude` running it. The loop seeds exactly three things into every step, so the session
+understands what just happened and what to do without re-reading the whole tree:
 
-## Headless / unattended runs (`--headless`)
+- the **last 5 commits** (`git log -5`) — recent code history;
+- the **next task** — `index.md`'s *Suggested next*;
+- a short **bigger-picture note** from `index.md` — the intent that shapes how the code is structured.
 
-```bash
-skills/continue/loop.sh --headless                 # unattended; auto-exit + auto-advance per step
-skills/continue/loop.sh --headless "/some-prompt"
-HEADLESS=1 skills/continue/loop.sh                 # same, via env
-```
+The step implements that task and ends with **one semantic commit** (the `commit` skill behavior), so
+the loop is **commit-driven**: clean, granular history, one commit per task. Because each step is a fresh
+process, context never grows across steps; `index.md` + git history are the only memory carried forward.
+The script changes nothing about the artifact tree itself; it only sequences cold processes.
 
-The interactive mode above needs an operator to end each step (Ctrl-D) and answer the `[Y/n]` prompt, so
-the run stalls at the first finished step if left alone. `--headless` removes both hands-on points: each
-step runs `claude -p`, which **auto-exits** when the step is done, and the loop **auto-advances** to the
-next step with no prompt — a true unattended Ralph loop. Context still zeroes per step (each `-p` run is
-a fresh process); `index.md` remains the only memory carried forward.
+## Interactive vs. unattended (`auto`)
 
-A `-p` session has **no interactive picker** (`AskUserQuestion`), so the driver signals the loop with a
-**text sentinel** on its last line — this is the source of truth for that contract:
+`auto` — the `--auto` flag, `AUTO=1`, or `settings.execution.auto` — decides whether a human stays in the
+loop between steps. There is no separate headless mode and no text-sentinel contract:
 
-| Last-line sentinel | Meaning | Loop does |
+| `auto` | Per step | Between steps |
 |---|---|---|
-| `<sdlc-done>COMPLETE</sdlc-done>` | Step 4 found no next step (project complete) | print "project complete", `exit 0` |
-| `<sdlc-gate>PAUSE: <reason></sdlc-gate>` | a safety-floor gate, or a gate that resolved to `pause`, needs a human | print the reason, **stop** (`exit 1`) |
-| *(none)* | routine **advance** step (saved confirmation already printed) | run the next step automatically |
+| `false` (default) | interactive `claude` (full TUI, normal permissions); you end the step (Ctrl-D / `/exit` / **Stop here**) | the loop asks `run the next step? [Y/n]` — Enter/`y` continues, `n`/`q` stops |
+| `true` | `claude -p` runs the step and **auto-exits**; `--auto` is passed so it skips its end-of-step questions | the loop **auto-advances** with no prompt |
 
-The loop appends a short directive to the prompt instructing the driver to follow this contract instead
-of presenting a picker. Pair headless with **`gatePolicy: auto`** so only the safety floor (and any
-explicit `pause` override) interrupts the run; under `manual`/`milestones` every routine gate emits the
-pause sentinel and the loop keeps stopping — the script **warns** when `gatePolicy` isn't `auto`. The
-`MAX_STEPS` cap still bounds the run; the completion sentinel just lets it exit early instead of running
-empty steps to the cap. After a pause-for-human stop, inspect and rerun — the step resumes from
-`index.md` exactly as a cold interactive step would.
+The `[Y/n]` is the loop's only stop control under `auto:false` (there is no `.sdlc/loop-control` file).
+Under `auto:true` the loop runs to `MAX_STEPS` with no sentinels to parse — a step that hits a
+correctness check (failed gate-validation, unresolved sync drift, a major version mismatch) halts inside
+the step itself. After any stop, inspect and rerun — the step resumes from `index.md` exactly as a cold
+step would.
 
 ## How it nests with the other loops
 
 - **`implement`'s per-task loop is not a separate inner loop** — each task *is* a step/process here.
   Within the `implement` phase one task runs per process, so a slice's `implement` spans as many
-  processes as it has tasks. The SessionSummary is the within-slice handoff
-  (`skills/implement/references/session-loop.md`), exactly as `index.md` is the cross-phase handoff.
+  processes as it has tasks. The within-slice handoff is the **commit history + `index.md`**
+  (`skills/implement/references/session-loop.md`) — there is no separate handoff file — exactly as
+  `index.md` is the cross-phase handoff.
 - **`doubt`** rests on the same fresh-context principle (a reviewer that hasn't seen your reasoning).
   Because each step here is a full process, `doubt` spawns its reviewer normally — no nesting limit.
 - **This loop is the only driver.** There is no in-session multi-step counterpart; hand-driven

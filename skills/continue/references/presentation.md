@@ -1,89 +1,33 @@
 # Continue — Presentation Contract (depth)
 
-Loaded on demand by the `continue` base skill. How the **driver**
-frames its **interactive** conversational output so that, at every step, the operator can see which
-phase we're in, what it operates on, where it sits in the loop, and exactly what they must do next.
+Loaded on demand by the `continue` base skill. How the **driver** frames its **interactive**
+conversational output so that, at each step, the operator sees what was just produced, what is worth
+discussing next, and the choice they own. This is a **light, conversational** contract — there is no
+phase banner, no `N/11` position, and no vertical phase map: the system navigates by **intent +
+advisory suggestion** (`continue` Step 4), not a fixed sequence, so a "you are at node 5 of 11" map
+would misrepresent how it actually moves.
 
 ## Scope (read first)
 
-- **The driver owns this framing.** Only `continue` emits it — it is the only actor
-  that knows loop position, the artifact identity (which `[REQ-n]`/`[TASK-m]`), and the resolved gate
-  decision (pause vs. advance). **Phase/transition skills never emit it** — they
-  are pure transforms that return a result the driver frames.
-- **Every step is interactive.** The driver always emits this framing — banners, maps, saved
-  confirmations, and, at a **pause** gate, the gate block + picker/footer. The only variation is the
-  gate hand-off: `gatePolicy` (via the gate-autonomy precedence in `fresh-context.md`) decides whether a
-  gate **pauses** (present the decision) or **advances** (skip the picker/gate block and end on the saved
-  confirmation). The `── step N ──` banner is printed by `loop.sh` itself between steps — not by the
-  driver — and is deliberately a **light** rule so it never collides with the **heavy** phase-start
-  banner the driver emits inside the step.
+- **The driver owns this framing.** Only `continue` emits it — it is the only actor that knows what was
+  ingested and the resolved next-step suggestion. **Phase/transition skills never emit it** — they are
+  pure transforms that return a result the driver frames.
+- **The `auto` switch decides the hand-off.** Under `auto: false` (default) a step presents the
+  end-of-step hand-off below; under `auto: true` it **skips** the hand-off, ends on the saved
+  confirmation, and the next fresh session auto-takes the suggested next step (see `fresh-context.md`).
+  The `── step N ──` light rule printed between steps is emitted by `loop.sh` itself, not the driver.
 
-## The four elements
-
-Running example throughout: the **design** phase (node 5 of 11) operating on **REQ-02 "saved-search
-alerts"**, under the default `gatePolicy: manual`.
-
-### 1. Phase-start banner — "a phase begins" (heavy rule `━`)
-
-Emitted **once**, at the top of the message in which a phase begins.
-
-```
-━━━ PHASE 5/11 · design ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-▶ REQ-02 · saved-search alerts
-  Producing: the design Plan (approach, architecture, risks).
-```
-
-- `N/11` is the position in the canonical phase graph (`constitution` = 1 … `maintain` = 11; the
-  `verify`/`test` node counts as one).
-- The second line names the artifact the phase operates on:
-  - a whole Requirement → `▶ REQ-02 · saved-search alerts`
-  - a Task slice → `▶ REQ-02 · TASK-03 · debounce alert fan-out`
-  - a phase with no single artifact (`constitution`, `specify` on a fresh project) → `▶ project · <slice name>`
-- The third line states what the phase produces, in one clause.
-- The **heavy** `━` rule is what distinguishes phase-start from the gate block (light `─`, below) and
-  the `── step N ──` banner `loop.sh` prints between steps — the weight contrast signals open-vs-close
-  without relying on color.
-
-### 2. Phase map — vertical checklist (heavy rule's companion)
-
-Emitted **once**, directly under the start banner. Self-labeling and wrap-proof — each phase is its own
-short line, so terminal width never breaks it.
-
-```
-Phases:
-  ✓ constitution
-  ✓ specify
-  ✓ to-requirements
-  ✓ clarify
-  ▶ design            ← you are here
-    to-tasks
-    implement
-    verify/test
-    review
-    deploy   ⚠
-    maintain
-```
-
-- `✓` done · `▶` current · (leading blank) pending.
-- `⚠` marks the **safety-floor** gate (`deploy`) straight from the gate-decision table — the operator
-  sees the always-pause gate ahead.
-- **Under `gatePolicy: milestones` only,** append `★` to the milestone phases
-  (`constitution`/`specify`/`design`/`review`) so the operator sees which gates will pause:
-  `▶ design   ★`. Omit `★` under `manual`/`auto` — it would be noise.
-- The longest content line (`to-requirements`, plus the `← you are here` tag on the current line) is
-  ~35 cols — **never wraps at 80 and survives to ~40 cols**.
-
-### 3. Phase complete & saved — "the tree is persisted" (light rule `─`)
+## 1. Saved confirmation — "the tree is persisted" (light rule `─`)
 
 Emitted on **every successful ingest** — after the driver has written the artifact(s) to the tree,
-updated `index.md`, and **gate-validation has passed**. This is the signal that the phase finished *and*
-the file tree is now on disk, so the conversation is disposable: the operator can `/clear` or close the
-session without losing context. **Only assert this once ingest + gate-validation succeed** — if
-validation fails, surface that failure instead (the tree is not safe to leave).
+updated `index.md`, and **gate-validation has passed**. It signals the phase finished *and* the file
+tree is on disk, so the conversation is disposable: the operator can `/clear` or close without losing
+context. **Only assert this once ingest + gate-validation succeed** — on failure, surface that failure
+instead (the tree is not safe to leave).
 
-Full form (when the step **stops** — manual `continue`, or a pause gate):
+Full form (when the step **stops** — manual `continue`, or a pause):
 ```
-─── design complete · saved ──────────────────────
+─── design saved ──────────────────────────────────
 ✓ REQ-02.DESIGN  → requirements/REQ-02/design.md   (updated in place)
 ✓ index.md       → registry + status updated
 
@@ -93,170 +37,93 @@ Safe to clear or close — index.md holds the state; resume with /continue.
 - One `✓` line per artifact written: `<stable ID> → <path>` with `(updated in place)` or `(created)`.
   A `to-*` fan-out lists each new ID or summarizes (`✓ REQ-01…REQ-04 → requirements/  (4 created)`).
 - The `✓ index.md → registry + status updated` line **always** appears — every ingest touches it.
-- The closing **safe-to-clear** line states the session is now disposable, in the system's own
-  disposability terms (`index.md` + the tree are the only memory carried forward). **No git mention** —
-  ingest writes files to disk; committing is the operator's separate step.
+- The closing **safe-to-clear** line states the session is now disposable in the system's own terms
+  (`index.md` + the tree are the only memory carried forward). **No git mention** — ingest writes files;
+  committing is a separate step.
 
-Compact form (when the operator runs `continue` again **in the same interactive session** rather than a
-fresh one — avoids restacking the full block each step):
+Compact form (when the operator runs `continue` again **in the same interactive session**):
 ```
 ✓ saved · REQ-02.DESIGN, index.md
 ```
 
-### 4. The gate hand-off — make it unmistakably the operator's turn
+## 2. End-of-step hand-off (`auto: false`) — the conversational contract
 
-At a resolved-**pause** gate (see Cadence), after the saved confirmation, hand the **decision** to the
-operator. The decision is the gate's **specific** question, sourced from the gate-decision table in
-`phase-graph.md` (e.g. `Is the approach/architecture sound and the risks acceptable?`) — never a generic
-"looks good?". **The primary mechanism is an interactive selection picker**, not prose: present that
-question as a multiple-choice question the operator clicks (the harness's question/selection tool — in
-Claude Code, `AskUserQuestion`). A picker reads as "your turn, pick one" far more clearly than a
-paragraph the operator must read and answer by typing — which was the whole point of this element.
+This replaces the old heavy gate block. After the saved confirmation, the driver hands the conversation
+to the operator in **three parts, in order**:
 
-**Capability ladder (one of three, in order):**
+1. **Critical open topics first.** Surface any open topics/questions that still genuinely need
+   discussion before this artifact is sound — the things that would bite if left unresolved. When there
+   are critical ones, lead with them: they are the reason to keep talking before progressing.
+2. **If none are critical, offer related topics + concrete examples.** When nothing is critical, suggest
+   1–3 related angles worth exploring, **each with a concrete example** so the operator reacts to
+   something specific rather than an abstract prompt. This is how `clarify`/`design` keep deepening a
+   living spec instead of rushing forward.
+3. **Present the choice** the operator owns:
+   - **Progress to next phase** — take the suggested next step (`continue` Step 4 names it concretely).
+   - **Continue with a topic** — re-run this phase **in place** on a chosen topic (no fork).
+   - **Stop here** — pause the loop; `index.md` holds the state.
 
-1. **Interactive picker available** → present the decision as a picker. Its **question** is the gate's
-   specific decision (from the gate table in `phase-graph.md`); its **options** are
-   the gate-specific set below. The "request changes / not ready / hold" path always carries a
-   **free-text note** (the picker's note / "Other" free-text) so the operator says *what* to change
-   inline. A one-line decision recap is emitted **above** the picker as the detail the short
-   option labels can't carry — prefix it with `★` at milestone gates
-   (`constitution`/`specify`/`design`/`review`), omit it otherwise.
-2. **No picker in the harness** → fall back to the **`── NEXT ──` text footer** (templates below): a final
-   light-rule block, `→`-prefixed options, each with an `— …` consequence clause. The operator types
-   their choice. Behavior is otherwise identical.
-3. **No human present (headless `claude -p`, e.g. `loop.sh --headless`)** → there is no one to pick or
-   type, so emit a **text sentinel** on the message's last line instead of a picker/footer: a **pause**
-   or safety-floor gate emits `<sdlc-gate>PAUSE: <reason></sdlc-gate>` and stops; an **advance** gate
-   emits no hand-off at all (the saved confirmation is the final block); and when there is no next step
-   the driver emits `<sdlc-done>COMPLETE</sdlc-done>`. The loop reads these to stop or auto-advance — the
-   full contract is in `fresh-context.md`. (Headless runs under `gatePolicy: auto`, so routine gates
-   advance silently and only the safety floor / a `pause` override trips the sentinel.)
+**Prefer an interactive picker** (in Claude Code, `AskUserQuestion`) over a typed prompt — a pick reads
+as "your turn" far more clearly than a paragraph the operator must answer by typing. When no picker is
+available, fall back to a light `── next ──` text footer with the same three options, each with a short
+consequence clause. The hand-off is **always the last thing in the message**; nothing follows it.
 
-This ladder applies at a **pause** gate. At an **advance** gate (`gatePolicy` resolved the gate to
-auto-advance — see `fresh-context.md`) there is **no** hand-off at all: the saved confirmation is the
-final block and the step ends. The safety-floor gates always pause, so they always reach the ladder.
+Picker form: the **question** is "Where next on REQ-02?" (or the phase's specific decision); the
+**options** are the three above, with the *Continue with a topic* path carrying a **free-text note** so
+the operator names which topic. A one-line recap of the critical/related topics sits **above** the picker.
 
-**Picker option sets (gate-specific).** A picker holds ~4 explicit options plus an always-available
-free-text "Other"; where space is tight the feedback/changes path rides the note/"Other" rather than
-taking an option slot.
-
-| Gate | Question | Options (first = affirmative/continue) |
-|---|---|---|
-| Routine pause gate | the phase's specific decision | **Approve** (continue to the next phase) · **Request changes** (note what to change; re-runs the phase in place) · **Stop here** (pause the loop) |
-| verify/test (`verifyMode: ask`) | "Which verification level?" | **test** (TDD) · **verify** (run-and-observe) · **both** · **Skip** (proceed without verifying — slice recorded **unverified**) — *not-ready feedback via the note* |
-| deploy ship authorization (⚠ safety floor) | the ship go/no-go | **Authorize ship** (perform the deploy now — irreversible) · **Hold** (do not ship; back to review / feedback) |
-| to-requirements fan-out | "Right set? Which slice first?" | **Approve** (accept the set; start with the proposed slice) · **Re-slice** (different first slice / priority) · **Edit set** (add/drop/merge; re-runs the transition) — *other feedback via the note* |
-| to-tasks fan-out (→ implement) | "Are tasks sized, ordered, and the dependency graph correct?" | **Approve** (accept the set; start implementing) · **Clarify next requirement** (accept tasks but defer implement; re-enter `clarify` on the next draft requirement — *shown only when a draft requirement remains*) · **Re-slice** (different task slicing / order) · **Edit set** (add/drop/merge tasks; re-runs to-tasks) — *other feedback via the note* |
-
-- **verify/test `Skip`** advances `implement → review` **without** verification; the driver records the
-  slice as **unverified** in the status dashboard / session summary — a deliberate, logged choice, never
-  silent. (`verifyMode`'s settings enum is unchanged; `Skip` is a runtime picker choice only.)
-- **deploy** restates target, version, ship command, and rollback in the element-3 block above the picker
-  (matching the "Authorization gate" wording in `skills/deploy/references/deploy-guide.md`); `Authorize
-  ship` is the distinct affirmative, never inferred from a prior review approval.
-- **to-tasks `Clarify next requirement`** advances to `clarify` on the next **draft** requirement instead
-  of `implement`, marking this requirement `tasks ready · deferred` (the driver implements deferred slices
-  in priority order once no draft remains — see `SKILL.md` Step 4). It appears **only when a draft
-  requirement remains**; with none left, the gate shows just Approve / Re-slice / Edit set. Under
-  `settings.execution.traversal: requirements-first` it is the **first/affirmative** option (Approve
-  follows it); under the default `depth-first`, `Approve` stays first.
-
-**`── NEXT ──` text footer (fallback form).** Same options as the picker, as a final block; nothing
-follows it.
-
-Routine pause gate (e.g. `design → to-tasks`):
+Footer fallback:
 ```
-─── NEXT ──────────────────────────────────────────
-→ Approve         — continue to to-tasks (phase 6/11)
-→ Request changes — tell me what to change; I re-run design in place
-→ Stop here       — pause the loop
+─── next ──────────────────────────────────────────
+→ Progress to next phase — <suggested step, e.g. to-tasks on REQ-02>
+→ Continue with a topic  — tell me which; I re-run design in place
+→ Stop here              — pause; index.md holds the state
 ```
 
-verify/test (`verifyMode: ask`):
-```
-─── NEXT · pick verification ──────────────────────
-→ test   — TDD, write failing tests first (RED → GREEN → REFACTOR)
-→ verify — run-and-observe the behavior
-→ both   — tests now, then observe
-→ Skip   — proceed to review without verifying (recorded unverified)
-```
+**Loop-by-default (clarify/design).** `clarify` and `design` **loop by default**: every iteration
+**writes the artifact in place before this hand-off**, so *Continue with a topic* always re-enters an
+already-saved artifact (never a fork). Choosing a topic re-runs the phase, writes again, and returns here.
 
-deploy ship authorization (safety floor):
-```
-─── NEXT · SHIP AUTHORIZATION ⚠ ───────────────────
-About to ship saved-search alerts to PROD as v1.4.0
-  via `npm run build && npm run deploy:prod`.
-  Rollback: `npm run deploy:rollback v1.3.4` / revert abc123.
+## 3. Other steps (transition fan-outs, opt-in steps)
 
-→ Authorize ship — perform the deploy now (irreversible)
-→ Hold           — do not ship; back to review / feedback
-```
+Transition fan-outs (`to-requirements`, `to-tasks`) and **opt-in** steps (`verify`/`test`, `deploy`) owe
+the same lightweight hand-off, but their options are the step's specific decision rather than the
+topic-exploration triad:
 
-to-requirements fan-out:
-```
-─── NEXT · review the fan-out ─────────────────────
-Fanned out: 4 requirements (REQ-01…REQ-04), 3 stakeholders.
-First slice proposed: REQ-02 · saved-search alerts.
+- **`to-requirements` / `to-tasks`** — **Approve** (accept the set; start the proposed slice) ·
+  **Re-slice** / **Edit set** (re-runs the transition) — other feedback via the note.
+- **`verify`/`test`** (opt-in, only when observable behavior exists) — **test** (TDD) · **verify**
+  (run-and-observe) · **both** · **Skip** (proceeds without verifying; slice recorded **unverified**).
+- **`deploy`** (opt-in, outward and irreversible, only when a deploy actually exists) — restate target,
+  version, ship command, and rollback **above** the picker; **Authorize ship** · **Hold**. The
+  affirmative is explicit, never inferred from a prior review approval.
 
-→ Approve   — accept the set; start with REQ-02 → clarify
-→ Re-slice  — different first slice / different priority
-→ Edit set  — add / drop / merge requirements; I re-run to-requirements
-```
+A finished `implement` task with **more tasks remaining** owes **no** decision — emit the saved
+confirmation and a plain `next: [REQ-n.TASK-m]` pointer (no picker); the only thing to do is run it.
 
-to-tasks fan-out (→ implement) — the `Clarify next requirement` line shows only when a draft requirement
-remains:
-```
-─── NEXT · review the tasks ───────────────────────
-REQ-02 · saved-search alerts: 5 tasks (TASK-01…TASK-05), dep graph ready.
-Next draft requirement: REQ-03 · digest scheduling.
+## 4. `auto: true`
 
-→ Approve                  — accept the tasks; start implementing TASK-01
-→ Clarify next requirement — defer implement; clarify the next draft REQ (REQ-03)
-→ Re-slice                 — different task slicing / order
-→ Edit set                 — add / drop / merge tasks; I re-run to-tasks
-```
-
-**Hand-off invariants (picker and footer alike):**
-- The hand-off is the **last** thing in the message; nothing follows it.
-- The first option is the affirmative/continue path, and its consequence is concrete (which phase, which
-  artifact) so "Approve" is never blind.
-- A changes/feedback path is always present and always carries a **note** stating what to change; acting
-  on it re-enters the phase **in place** (no parallel fork).
+No hand-off at all: the saved confirmation is the final block and the next fresh session auto-takes the
+suggested next step. A **correctness check** (failed gate-validation, unresolved sync drift, a major
+version mismatch) always stops for the human regardless of `auto`.
 
 ## Cadence (the anti-noise rule)
 
-- **Phase-start banner + vertical map:** once per phase, at its start. **Not** mid-phase, **not** per
-  tool call. This is the single most important rule for keeping the display from becoming wallpaper.
-- **Saved confirmation:** once per **successful ingest** (the "phase finished + tree saved" marker) —
-  full form when the session ends here (the normal case), compact one-line form when the operator runs
-  `continue` again in the same interactive session. Emitted only after gate-validation **passes**; on
-  failure surface the validation error, not a "saved" claim.
-- **Gate decision + hand-off (picker or footer):** once, at a **pause** gate the step stops on, wherever
-  the operator owes a decision. At an **advance** gate (`gatePolicy` resolved it to auto-advance) emit no
-  hand-off — the saved confirmation is the final block. A finished `implement` task with **more tasks
-  remaining** is likewise not a gate: emit the saved confirmation and a plain "next: `[REQ-n.TASK-m]`"
-  pointer (no picker), since the only thing to do is run the next task.
-- **Mid-phase work** (the phase doing its work, tool calls, reasoning) carries **no** banners, maps, or
-  hand-offs — they are phase-boundary furniture only.
+- **Saved confirmation:** once per **successful ingest** — full form when the session ends here, compact
+  one-line form when the operator runs `continue` again in the same session. Emitted only after
+  gate-validation **passes**; on failure surface the validation error, not a "saved" claim.
+- **End-of-step hand-off:** once, under `auto: false`, as the message's **final block**. None under
+  `auto: true`, and none for a non-final `implement` task (just the next-task pointer).
+- **Mid-phase work** (tool calls, reasoning) carries **no** furniture — the hand-off is a phase-boundary
+  element only.
 
-## Line-wrapping & graceful degradation (the width ladder)
+## Line-wrapping & graceful degradation
 
-**No element's correctness depends on the terminal width.** Concretely:
-
-1. **Normal (≥ ~60 cols):** the forms above. Rules are a **fixed short run** (~50 chars) that looks
-   intentional — never a full-width fill the agent expects the terminal to wrap.
-2. **Narrow (~40–60 cols):** shorten the rule runs; keep the vertical map (already wrap-safe); break
-   long decision questions / ship details onto a continued line with a **2-space indent** (as shown)
-   rather than letting the terminal hard-wrap mid-word.
-3. **Very narrow (< ~40 cols) or glyphs unsafe:** replace the vertical map with the **compact bar** —
-   `[✓✓✓✓▶······]  5/11 · design` (11 glyphs, one per phase, fixed order; ~24 cols, never wraps) — and
-   if even that is doubtful, a plain `Phase 5/11 · design` indicator. The gate hand-off (picker, or the
-   `── NEXT ──` footer when no picker is available) is **always** kept — it is the load-bearing element;
-   in the footer fallback, allow its `— …` clauses to drop to a second indented line.
-
-**Universal rule:** never emit a box-drawing rule whose appearance depends on the terminal wrapping it;
-rules are fixed-short, the map is atomic-short per line, and long prose is pre-wrapped by hand.
+**No element's correctness depends on the terminal width.** Rules are a **fixed short run** (~50 chars)
+that looks intentional — never a full-width fill the agent expects the terminal to wrap. Long prose is
+pre-wrapped by hand; break long lines onto a **2-space-indented** continued line rather than relying on
+the terminal. The hand-off (picker, or the `── next ──` footer when no picker is available) is **always**
+kept — it is the load-bearing element.
 
 ## Marker vocabulary
 
@@ -264,14 +131,8 @@ All glyphs are already in use in this repo — keep them consistent.
 
 | Glyph | Meaning | Where it already appears |
 |---|---|---|
-| `━` | interactive **phase-start** banner (heavy rule) | new here (heavy weight reserved for phase-start) |
-| `─` | saved / gate / closing block & `NEXT` footer; also the `── step N ──` banner `loop.sh` prints between steps | `fresh-context.md` step banner |
+| `─` | saved / next / closing block & footer; also the `── step N ──` banner `loop.sh` prints between steps | `fresh-context.md` step banner |
 | `✓` | done / passed / **saved (artifact written)** | `deploy-guide.md` pre-ship checklist |
-| `▶` | current phase / active artifact | README loop diagram |
-| `·` | pending phase (in the compact bar) / separator | repo-wide separator |
-| `★` | milestone gate | `phase-graph.md` gate-decision table |
-| `⚠` | safety-floor gate (always pauses) | `phase-graph.md` gate-decision table |
-| `→` | an action / option (and graph flow) | `phase-graph.md`, README, `specify` ASSUMPTIONS |
-
-The **Decision** question rendered in element 4 is sourced from the gate-decision table in
-`phase-graph.md` — that table is the single source of the questions; this contract only renders them.
+| `▶` | active artifact | README loop diagram |
+| `·` | separator | repo-wide separator |
+| `→` | an action / option | README, `specify` ASSUMPTIONS |

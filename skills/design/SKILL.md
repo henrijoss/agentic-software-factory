@@ -15,6 +15,11 @@ Keep design at the **approach/architecture** altitude. Decomposing the approach 
 tasks is `to-tasks`, the next skill — design produces the Plan, `to-tasks` splits it. Letting task
 breakdown leak into design conflates the two halves the architecture deliberately keeps split.
 
+`design.md` is **ephemeral working scaffolding** — a throwaway aid for building one requirement's
+slice, **removed when that slice is finished**. The durable record of *why* something was built and
+which prior approaches are worth reusing lives in the **git commits/tree**, not in `design.md`. So
+design freely; it is not a permanent document to curate.
+
 ## When to Use
 
 - A Requirement is ready to design against and the approach isn't obvious.
@@ -68,11 +73,18 @@ uncertainty. Fold findings back into the approach.
 Emit the Plan per the result contract — the body plus its gate decision — for the caller to ingest.
 Write no files and resolve no storage; persistence and any re-entry overwrite are the driver's job.
 
-### 6. Gate
+### 6. Loop by default, then hand off
 
-Force the decision: *"Is the approach and architecture sound, and are the risks acceptable?"* This gate
-earns its interruption: tasks and code commit to this approach. Surface it for the caller — standalone,
-present it to the user; under a driver, the driver holds the gate.
+`design` **loops by default**: each pass emits the updated Plan (the driver writes it **in place** before
+the hand-off), so the approach can keep deepening rather than being forced forward. For the hand-off,
+surface **critical open topics** still needing discussion before the approach is sound; if none are
+critical, offer **related topics + concrete examples** worth exploring. The bar to progress: is the
+approach and architecture sound, and are the risks acceptable? — tasks and code commit to this approach.
+
+Surface this for the caller — standalone, present it to the user; under a driver, the driver writes the
+Plan in place and presents the *Progress to next phase · Continue with a topic · Stop here* choice
+(`references/presentation.md`). Under `auto`, the questions are skipped and the suggested next step is
+auto-taken.
 
 ## Artifact shape
 

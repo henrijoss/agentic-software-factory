@@ -29,10 +29,10 @@ adversarial review, `review` **invokes `doubt`** for the deep correctness pass a
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** the implemented + verified slice (code/diff, its **Tasks**, the **SessionSummary** for
-  what changed), plus the **Spec/Requirement**, the **Plan**, and the **Constitution** to review
-  against — all provided by the caller. If the caller provides a **doubt-pass count**, run that many
-  `doubt` passes on the correctness pass; otherwise use your own judgment.
+- **Input:** the implemented + verified slice (code/diff, its **Tasks**, and the recent **commit
+  history** for what changed), plus the **Spec/Requirement**, the **Plan**, and the **Constitution** to
+  review against — all provided by the caller. If the caller provides a **doubt-pass count**, run that
+  many `doubt` passes on the correctness pass; otherwise use your own judgment.
 - **Output:** findings + a disposition each, emitted per the result contract. No new artifact and no
   SDLC storage — the driver records the gate state. Each finding carries a routing hint (rework → back
   to `implement`; a stale upstream artifact → back to `specify`/`design`); the driver routes.
@@ -42,8 +42,8 @@ adversarial review, `review` **invokes `doubt`** for the deep correctness pass a
 ### 1. Read what to review against
 
 Read the **Constitution** (standing bars), the Spec/Requirement (the *right thing?*), the Plan (the
-*planned way?*), the Tasks' acceptance criteria, and the SessionSummary (what changed). Without the
-intended contract, a review is just opinion.
+*planned way?*), the Tasks' acceptance criteria, and the recent **commit history** (what changed).
+Without the intended contract, a review is just opinion.
 
 ### 2. Correctness — invoke `doubt`
 

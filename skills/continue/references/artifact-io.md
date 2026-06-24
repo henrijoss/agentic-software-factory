@@ -20,7 +20,6 @@ integrations**.
 | **Requirement** (Use-case) | `REQ-<n>` | `to-requirements` | `clarify` → `design` | One unit of desired behavior/value |
 | **Plan** (design) | `REQ-<n>.DESIGN` | `design` | `to-tasks` | Implementation approach, architecture, risks for one Requirement |
 | **Task** | `REQ-<n>.TASK-<m>` | `to-tasks` | `implement` | Small, verifiable unit of work with acceptance criteria |
-| **SessionSummary** | `REQ-<n>.SESSION` | `implement` | `implement` (next), `review` | Fresh-context handoff: what's done, what's next, open issues |
 | **Deploy log** | `DEPLOY` | `deploy` | `maintain` | Record of what shipped and when |
 | **Maintenance queue** | `MAINT` | `maintain` | `specify` | Triaged live issues fed back into the loop |
 
@@ -57,12 +56,37 @@ docs/<root>/          ← root chosen at `setup`; default `docs/sdlc/`
       design.md       ← [REQ-01.DESIGN]
       tasks/
         TASK-01.md    ← [REQ-01.TASK-01]
-      sessions/
-        summary.md    ← [REQ-01.SESSION]
     REQ-02/ …
   deploy/log.md       ← [DEPLOY]      (optional — appears when deploy runs)
   maintenance/queue.md← [MAINT]       (optional — appears when maintain runs)
 ```
+
+**Durable vs. ephemeral.** Two classes of file live in the tree:
+
+- **Living specs — durable, updated in place, never deleted.** `constitution.md`, `spec.md`, and each
+  `requirements/REQ-<n>/requirement.md` are the source of truth for *what* and *why*. They are
+  re-entered freely **before and after** implementation (a requirement can be re-clarified mid- or
+  post-implementation when code teaches something new), always overwritten in place, and **never
+  removed** — they outlive any single slice.
+- **Ephemeral scaffolding — working files, removed when the slice is finished.** `design.md` and
+  `tasks/` are throwaway working files for one requirement's implementation; the durable record of *why*
+  something was built (and prior approaches worth reusing) lives in the **git commits/tree**, not in
+  these files; they are removed once the requirement's slice is finished (the driver's finish-cleanup —
+  see *Finishing a requirement* in the `continue` base skill). The per-slice handoff is held by
+  `index.md`'s status (Last worked / Suggested next) plus the last few commits — there is no separate
+  per-session handoff level in the tree.
+
+**Recovering a removed design/task from git.** Because the ephemeral files were versioned with the code
+before deletion, they are always retrievable from history — deletion loses nothing:
+
+```sh
+git log -- docs/sdlc/requirements/REQ-03/design.md     # find the commits that touched it
+git show <sha>:docs/sdlc/requirements/REQ-03/design.md  # print the file as of that commit
+git log --diff-filter=D -- 'docs/sdlc/requirements/REQ-03/tasks/*'  # find when tasks were removed
+```
+
+Resolve `docs/sdlc/` to the project's actual root. This is *why* deleting the scaffolding is safe: git
+is the durable record.
 
 **`index.md` — the root object** plays three roles simultaneously:
 - **Tree map:** the navigable structure (which artifacts exist and how they nest).
@@ -78,7 +102,6 @@ docs/<root>/          ← root chosen at `setup`; default `docs/sdlc/`
 | Requirement | `docs/sdlc/requirements/REQ-<n>/requirement.md` | read file | create dir + file; register in `index.md` |
 | Plan (design) | `requirements/REQ-<n>/design.md` | read file | write file (in place) |
 | Task | `requirements/REQ-<n>/tasks/TASK-<m>.md` | read file | create file; register in `index.md` |
-| SessionSummary | `requirements/REQ-<n>/sessions/summary.md` | read file | write file (in place) |
 | Deploy log | `docs/sdlc/deploy/log.md` | read file | append entry |
 | Maintenance queue | `docs/sdlc/maintenance/queue.md` | read file | append/triage entry |
 
@@ -117,14 +140,17 @@ first write. Minimal root:
 | ID | Path | Status |
 |----|------|--------|
 ## Status
-Project: bootstrapped — no phases run yet.
+Last worked: bootstrapped — no phases run yet
+Suggested next: specify
 Last synced commit: <sha | none>
 ```
 
-(Brownfield projects read `bootstrapped (brownfield: <stack>) — no phases run yet` — a one-line signal
-from `setup`, never a code inventory.) `Last synced commit` is the git `HEAD` the system last reconciled
-against; the driver maintains it via the sync check (see the `continue` base skill and
-`references/sync.md`).
+(Brownfield projects read `bootstrapped (brownfield: <stack>) — no phases run yet` for **Last worked** —
+a one-line signal from `setup`, never a code inventory.) The three status lines — **Last worked /
+Suggested next / Last synced commit** — are the cross-step memory the driver reads when no explicit
+intent is given; with the last few commits they carry the per-slice handoff.
+`Last synced commit` is the git `HEAD` the system last reconciled against; the driver maintains it via
+the sync check (see the `continue` base skill and `references/sync.md`).
 
 **`settings.json` (system file, beside `index.md`).** `docs/<root>/settings.json` pins the skillset
 version the tree was created/migrated with and holds tweakable execution preferences (schema + defaults

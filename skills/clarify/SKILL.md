@@ -1,15 +1,21 @@
 ---
 name: clarify
-description: Deepens one draft Requirement into a ready one — resolves its open questions and turns draft acceptance signals into sharp, testable, unambiguous criteria, so `design` can plan against it without guessing. The human deep-dive on a single requirement; its engine is the `interview` posture. Use when a requirement chosen for the next slice is still ambiguous. Distinct from `to-requirements` (which fans the spec into many drafts) and `design` (the how): clarify makes one requirement ready.
+description: Sharpens one Requirement — resolves its open questions and turns vague acceptance signals into sharp, testable, unambiguous criteria, so `design` can plan against it without guessing. The human deep-dive on a single requirement; its engine is the `interview` posture. `requirement.md` is a living spec: re-enter to re-clarify any time — including mid/post-implementation when code teaches something new — updated in place, never closed. Use when a requirement chosen for the next slice is still ambiguous. Distinct from `to-requirements` (which fans the spec into many drafts) and `design` (the how).
 ---
 
 # Clarify
 
 ## Overview
 
-`clarify` takes one **draft Requirement** and makes it **ready**: every open question resolved (or
-explicitly deferred), and the draft acceptance signals sharpened into unambiguous, testable criteria.
-It is the deep-dive that ensures the next phase isn't designing against a moving target.
+`clarify` **sharpens** one Requirement: every open question resolved (or explicitly deferred), and
+vague acceptance signals sharpened into unambiguous, testable criteria. It is the deep-dive that ensures
+the next phase isn't designing against a moving target.
+
+`requirement.md` is a **living spec** — there is no one-way "draft → ready" transition that closes it.
+A requirement can be re-clarified **at any point**: before design, but also **mid- or
+post-implementation**, when working code teaches something the requirement got wrong. Every re-entry
+updates `requirement.md` **in place** (the driver overwrites it, never forks a copy); the requirement
+is never "already ready, cannot re-open".
 
 Its **engine is the `interview` posture** — one question at a time, with a guess attached, until the
 intent is pinned. `clarify` doesn't reimplement that; it *invokes* `interview` and adds the
@@ -21,7 +27,8 @@ Requirement.
 
 - A Requirement chosen for the next slice still carries open questions or vague acceptance.
 - Before `design`, when the approach can't be chosen because the *what* is still fuzzy.
-- Re-entering to re-clarify when a requirement's intent shifts.
+- Re-entering to re-clarify **at any point** — including mid- or post-implementation — when intent
+  shifts or working code reveals the requirement was wrong.
 
 **When NOT to use:**
 
@@ -31,17 +38,17 @@ Requirement.
 
 ## Inputs / Outputs (abstract)
 
-- **Input:** one draft **Requirement**, its **Stakeholders**, and the **Constitution** — all provided
-  by the caller.
-- **Output:** the same **Requirement** brought to *ready* — sharp acceptance criteria, open questions
-  resolved or explicitly deferred — emitted per the result contract for the caller to ingest. The skill
-  writes no files and resolves no storage.
+- **Input:** one **Requirement** (at any maturity — fresh draft or one revisited post-implementation),
+  its **Stakeholders**, and the **Constitution** — all provided by the caller.
+- **Output:** the same **Requirement**, sharpened — sharp acceptance criteria, open questions resolved
+  or explicitly deferred — emitted per the result contract for the caller to ingest, who updates
+  `requirement.md` in place. The skill writes no files and resolves no storage.
 
 ## Process
 
-### 1. Read the draft and its context
+### 1. Read the requirement and its context
 
-Read the **Requirement** (the use-case, draft acceptance, open questions), its **Stakeholders**, and the
+Read the **Requirement** (the use-case, current acceptance, open questions), its **Stakeholders**, and the
 **Constitution**. Clarify *this one* requirement — don't re-open the fan-out (that's `to-requirements`).
 
 ### 2. Resolve the unknowns via `interview`
@@ -53,7 +60,7 @@ mechanics — invoke them.
 
 ### 3. Sharpen acceptance into testable criteria
 
-Turn each draft acceptance signal into a criterion `verify`/`test` could check objectively: concrete
+Turn each rough acceptance signal into a criterion `verify`/`test` could check objectively: concrete
 conditions, edge/negative cases the use-case implies, and an explicit out-of-scope line. Vague
 acceptance is the main thing `clarify` exists to kill.
 
@@ -69,11 +76,18 @@ Emit the ready Requirement per the result contract — the use-case stays; accep
 open-questions section shrinks to resolved/deferred. Write no files; persistence and the in-place
 overwrite of the existing requirement are the driver's job.
 
-### 6. Gate
+### 6. Loop by default, then hand off
 
-Force the readiness decision: *"Is this one requirement unambiguous enough to design against?"* The
-bar: could `design` proceed without guessing, and could `verify`/`test` check acceptance objectively?
-Surface it for the caller — standalone, present it to the user; under a driver, the driver holds the gate.
+`clarify` **loops by default**: each pass emits the updated requirement (the driver writes it **in place**
+before the hand-off), so the operator can keep deepening it rather than being forced forward. For the
+hand-off, surface **critical open topics** still needing discussion before the requirement is sound; if
+none are critical, offer **related topics + concrete examples** worth exploring. The bar to progress:
+could `design` proceed without guessing, and could `verify`/`test` check acceptance objectively?
+
+Surface this for the caller — standalone, present it to the user; under a driver, the driver writes the
+requirement in place and presents the *Progress to next phase · Continue with a topic · Stop here* choice
+(`references/presentation.md`). Under `auto`, the questions are skipped and the suggested next step is
+auto-taken.
 
 ## Ready Requirement shape
 
@@ -81,7 +95,7 @@ Short form below; the readiness checklist, sharpening technique, and a worked ex
 `references/clarify-guide.md`.
 
 ```markdown
-# [use-case title]   (ready)
+# [use-case title]
 
 **As a** [stakeholder] **I want** [capability] **so that** [value].
 **Acceptance:**

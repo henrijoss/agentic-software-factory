@@ -1,10 +1,11 @@
-# Phase Graph — Sequencing (depth)
+# Phase Graph — advisory "what usually follows next"
 
-Loaded on demand by the `continue` base skill. The canonical phase
-graph, gate-decision table, entry modes, and the tree-root bootstrap procedure. `continue` walks this
-graph one step at a time; the `loop.sh` fresh-process loop relaunches it per step to advance along it.
+Loaded on demand by the `continue` base skill. An **advisory** map of what *usually* follows what, plus
+the entry modes and the tree-root bootstrap procedure. It is **not** an enforced sequence and carries
+**no gates**: the driver routes by operator **intent** and only *suggests* a likely next step from this
+map (see `continue` Step 4). The operator can always override the suggestion.
 
-## The phase graph
+## The usual order
 
 Linear spine, closed by `maintain → specify`:
 
@@ -13,87 +14,66 @@ constitution → specify → to-requirements → clarify → design → to-tasks
              → verify/test → review → deploy → maintain → (specify, next slice)
 ```
 
+The arrows mean "what commonly comes next", **not** "a required gate". Free navigation by intent is the
+rule; this order is only the default suggestion when the operator gives none.
+
 - **Postures are not nodes.** `interview`, `doubt`, `incremental` are invoked *inside* phases
   (`specify`/`clarify` call `interview`; `design`/`implement`/`review` call `doubt`; `implement`
-  follows `incremental`). A driver never schedules them — it only sequences phase/transition skills.
-- **`verify`/`test` is one node with a choice:** the operator picks TDD (`test`), run-and-observe
-  (`verify`), or both per the task — or may **Skip** verification entirely, advancing straight to
-  `review` with the slice recorded **unverified** (a deliberate, logged choice). The driver presents the
-  choice; the `test`/`verify` skills define which applies.
-- **Transition skills (`to-requirements`, `to-tasks`) fan out** and pause for user feedback as part of
-  their own gate — a driver just holds that gate like any other.
-- **At each node the driver assembles inputs before and ingests the result after.** Phase/transition
+  follows `incremental`). The driver never schedules them — it only routes to phase/transition skills.
+- **`verify`/`test` is opt-in:** suggested only when there is observable behavior to confirm. The
+  operator picks TDD (`test`), run-and-observe (`verify`), both, or skips it. Never mandatory.
+- **`deploy`/`maintain` are opt-in:** suggested only when a deployment/release/operation actually
+  exists — never mandatory mainline steps. `deploy` is an outward, hard-to-reverse action; authorize it
+  consciously whenever it is the chosen step.
+- **Transition skills (`to-requirements`, `to-tasks`) fan out** a set for the operator to review.
+- **At each step the driver assembles inputs before and ingests the result after.** Phase/transition
   skills are pure transforms emitting a result; the driver gathers their inputs from the tree and
-  persists their output into it (see `references/handoff.md`). The graph only sequences nodes.
+  persists their output into it (see `references/handoff.md`). The graph only suggests the next node.
 
-## Gate decisions (what each arrow forces)
+## Decisions each step typically weighs
 
-A driver poses the matching question at each gate — never a generic "looks good?". The ★ column marks
-the **milestone gates** (paused under `gatePolicy: milestones`); the ⚠ column marks the **safety floor**
-(always paused/halted, whatever the policy).
+When the driver suggests a step, these are the questions that step usually turns on — **advisory**
+prompts the operator weighs, not forced gates. The driver poses the matching one rather than a generic
+"looks good?".
 
-| Gate | ★ | ⚠ | Decision forced |
-|---|---|---|---|
-| constitution → specify | ★ | | Are the standing principles right before we commit intent to them? |
-| specify → to-requirements | ★ | | Is the objective/scope/success correct, and ready to fan out? |
-| to-requirements → clarify | | | Right use-cases and stakeholders? Which slice first? |
-| clarify → design | | | Is this requirement unambiguous enough to design against? |
-| design → to-tasks | ★ | | Is the approach/architecture sound and the risks acceptable? |
-| to-tasks → implement | | | Are tasks sized, ordered, and the dependency graph correct? |
-| implement → verify/test | | | Does the slice do what the task claims? Which verification level (or Skip → review, unverified)? |
-| verify → review | | | Is behavior confirmed and ready for adversarial review? |
-| review → deploy | ★ | | Findings resolved or consciously accepted as trade-offs? |
-| deploy → maintain | | ⚠ | Did it ship cleanly; what is now in operation? (+ pre-ship authorization) |
-| maintain → specify | | | Which discovered work re-enters the loop, at what priority? |
+| Step | Question it typically turns on |
+|---|---|
+| constitution → specify | Are the standing principles right before we commit intent to them? |
+| specify → to-requirements | Is the objective/scope/success correct, and ready to fan out? |
+| to-requirements → clarify | Right use-cases and stakeholders? Which slice first? |
+| clarify → design | Is this requirement unambiguous enough to design against? |
+| design → to-tasks | Is the approach/architecture sound and the risks acceptable? |
+| to-tasks → implement | Are tasks sized, ordered, and the dependency graph correct? |
+| implement → verify/test | Does the slice do what the task claims? Which verification level (if any)? |
+| verify → review | Is behavior confirmed and ready for adversarial review? |
+| review → deploy | Findings resolved or consciously accepted as trade-offs? |
+| deploy → maintain | Did it ship cleanly; what is now in operation? |
+| maintain → specify | Which discovered work re-enters the loop, at what priority? |
 
-`deploy` carries an extra, inverted gate *before* its action (explicit ship authorization) — honor it
-even within a driven session; review approval ≠ ship approval.
-
-The **`to-tasks → implement`** gate has two advance targets, chosen by `settings.execution.traversal`
-(`depth-first` default | `requirements-first`) plus the interactive **Clarify next requirement** picker
-option: advance to `implement` for this slice (`depth-first`), or **defer implement** and re-enter
-`clarify` on the next **draft** requirement (`requirements-first`). Deferring marks the requirement
-`tasks ready · deferred`; once every requirement is tasked (no draft left), the driver drains the
-deferred slices through `implement` in `to-requirements` priority order. The gate itself, its question,
-and its validation are unchanged — `traversal` only picks where an *advancing* gate goes.
-
-These decision questions are what the interactive call-to-action surfaces — editing a question here
-changes user-facing gate copy (the driver renders it per `references/presentation.md`). This table stays
-the single source of the questions; no display format lives here.
-
-### Gate autonomy (`gatePolicy`)
-
-How much human review the loop requires at these gates is set by `settings.execution.gatePolicy`
-(`manual` | `milestones` | `auto`, default `manual`) with optional per-phase `gateOverrides` — consumed
-only by the driver (the schema lives in the `continue` base skill's *Settings* subsection). At each
-gate the driver resolves *pause vs. advance* by precedence: **safety floor** (⚠ above, plus failed
-gate-validation, a held sync gate, an ambiguous next phase, and a major version mismatch — always
-pause/halt) → `gateOverrides[<phase>]` (`pause`/`auto`) → `gatePolicy` (`manual` pauses all; `auto`
-advances all; `milestones` pauses only the ★ gates). The gate and its **gate-validation run on every
-transition** regardless — `gatePolicy` only relaxes the human prompt at a *routine* gate.
-
-`gatePolicy` (pause vs. advance) and `execution.traversal` (the advance *target* at the
-`to-tasks → implement` gate) are orthogonal: a non-HITL gate under the default `depth-first` always
-progresses to `implement`; `requirements-first` is the opt-in that defers it to `clarify` the next draft.
+These questions are the advisory considerations surfaced per `references/presentation.md`. This table
+stays the single source of the questions; editing one changes the user-facing copy. No display format
+lives here.
 
 ## Entry modes (composition model)
 
 | Mode | Start | Behavior |
 |---|---|---|
-| **Full project** | `constitution` (or `specify` if `[CONST]` exists) | Walk the whole loop, slice by slice |
+| **Full project** | `constitution` (or `specify` if `[CONST]` exists) | Suggest the loop, slice by slice |
 | **Sub-chain** | the phase after the chosen artifact | e.g. a ready `[REQ-n]` → `design` → … |
-| **Resume** | what `index.md` status says is next | Continue from where we left off |
+| **Resume** | what `index.md`'s **Suggested next** points to | Continue from where we left off |
+| **Intent** | the phase the operator names | Route directly to it, update in place |
 | **Single** | — | Defer to the phase skill directly; no driver |
 
-When the start phase isn't unambiguous from `index.md`, confirm with the user rather than guessing.
+When no intent is given and the next step isn't obvious from `index.md`, propose a step plus 1–2
+alternatives rather than guessing (see `continue` Step 4).
 
-At session start — after resolving the tree root, before determining the start/next phase — both
-drivers run the **sync check** (`references/sync.md`): compare `index.md`'s `Last synced commit` to
-`HEAD` and, on external drift, hold the sync gate to reconcile before walking the graph.
+At session start — after resolving the tree root, before suggesting a step — the driver runs the **sync
+check** (`references/sync.md`): compare `index.md`'s `Last synced commit` to `HEAD` and, on external
+drift, reconcile before proceeding.
 
-On a **brownfield** project (status set by `setup`), **Full project** entry still starts at
+On a **brownfield** project (status set by `setup`), **Full project** entry still suggests starting at
 `constitution` — which harvests existing standing docs and captures existing-system facts by reference —
-then `specify`, which scopes the first slice as a delta against existing behavior. The graph is
+then `specify`, which scopes the first slice as a delta against existing behavior. The order is
 unchanged; only the framing (harvest + delta) differs from greenfield.
 
 ## Tree-root resolution & bootstrap

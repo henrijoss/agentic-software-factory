@@ -38,7 +38,7 @@ lives where it can't go stale — harvested by reference in `constitution`, read
 ## Inputs / Outputs (abstract)
 
 - **Input:** the project, an optional **tree-root name** (default `sdlc`), and optional confirmation of
-  the relevant execution prefs (`verifyMode`, `reviewLoops`, `gatePolicy`).
+  the relevant execution prefs (`auto`, `reviewLoops`).
 - **Output:** the bootstrapped tree root — a minimal `index.md` (tree map + ID registry + status
   dashboard) and a `settings.json` (version pin + execution prefs) at `docs/<root>/`, with status
   reflecting greenfield vs brownfield (+ stack), ready for the first phase. No other artifact — no code
@@ -87,13 +87,11 @@ producing phase runs.
 Beside `index.md`, write `docs/<root>/settings.json` using the schema/defaults defined by the `continue`
 base skill's *Settings* subsection. Set `version` to `continue`'s `SDLC_SKILLSET_VERSION` (the running
 skillset version — this is the pin downstream drivers check) and `treeRoot` to the location chosen in
-Step 3. Write the full `execution` block with its defaults, and **lightly confirm only the relevant
-prefs in one touch** — `verifyMode` (`test`/`verify`/`both`/`ask`, default `ask`), `reviewLoops`
-(adversarial `doubt` passes, default `1`), and `gatePolicy` (`manual`/`milestones`/`auto`, default
-`manual` — how much human review the loop requires at phase gates; this is the human-in-the-loop dial),
-and `traversal` (`depth-first`/`requirements-first`, default `depth-first` — whether to run each slice
-through to `deploy` before the next requirement, or do all requirements-engineering first then implement).
-Write `gateOverrides` as `{}`; it is the per-phase escape hatch, edited by hand later, not interrogated.
+Step 3. Write the full `execution` block with its defaults
+(`maxSteps`, `auto: false`, `reviewLoops: 1`, `commitPerStep: true`), and **lightly confirm only the
+relevant prefs in one touch** — `auto` (`false`/`true`, default `false` — whether the loop runs
+interactively or skips the end-of-step questions and auto-takes the suggested next step; this is the
+human-in-the-loop dial) and `reviewLoops` (adversarial `doubt` passes, default `1`).
 Do not interrogate the operator for every key; the rest are defaulted and editable by hand later. Never
 prompt for `version` — it is taken from the skillset, not the operator.
 
@@ -114,11 +112,13 @@ when no picker is available. The options, first = recommended:
    (`constitution`) and stops at its gate; repeat `/continue` per step, staying in control. **Selecting
    this proceeds into that first step now.**
 2. **Run it as a loop** — from the project root run `skills/continue/loop.sh`. It relaunches `/continue`
-   as a **fresh interactive process per step** (context zeroed each step; `index.md` is the carried
-   memory) — full TUI, normal permissions, the gate picker all work. You end each step's session when
-   it's done and the loop asks whether to continue. It honors `gatePolicy`: the default `manual` presents
-   a picker at every gate, so set `auto` or `milestones` in `settings.json` to skip the routine pickers
-   (`MAX_STEPS` / `execution.maxSteps` caps the run).
+   as a **fresh interactive process per step** (context zeroed each step; `index.md` + git history are
+   the carried memory) — full TUI, normal permissions, the interactive end-of-step hand-off all work.
+   You end each step's session when it's done and the loop asks whether to continue. It honors `auto`:
+   the default `false` runs the
+   interactive end-of-step hand-off each step, so set `auto: true` in `settings.json` (or drive
+   `loop.sh "/continue --auto"`) to skip the questions and auto-advance (`MAX_STEPS` /
+   `execution.maxSteps` caps the run).
 3. **Work with the skills by hand** — invoke a single phase skill directly for a one-off, then run
    `/continue` afterward to persist it into the tree.
 
@@ -155,8 +155,8 @@ Either way there is exactly one tree with one entry point.
 - [ ] A single minimal `index.md` created at the chosen location, with `Last synced commit` initialized
       to current `HEAD` (or `none`) — and no phase artifacts.
 - [ ] `settings.json` written beside it: `version` = `SDLC_SKILLSET_VERSION`, `treeRoot` = chosen root,
-      full `execution` block defaulted (`gateOverrides` = `{}`); only the relevant prefs lightly confirmed
-      (`verifyMode`, `reviewLoops`, `gatePolicy`, `traversal`), `version` not prompted.
+      full `execution` block defaulted (`auto: false`, `commitPerStep: true`); only the relevant prefs
+      lightly confirmed (`auto`, `reviewLoops`), `version` not prompted.
 - [ ] Structure/template deferred to the `continue` base skill; no duplicated structure definition.
 - [ ] Handoff reported the root path so downstream skills discover it by its single `index.md`.
 - [ ] Next-step hand-off presented the three paths (step / loop / manual) as the last block — picker or

@@ -16,10 +16,14 @@ where **fan-out** happens (one Plan → many Tasks). It adds real logic — sizi
 mapping — not just reformatting. It does **not** decide the approach (that's `design`, upstream) or
 write code (that's `implement`, downstream).
 
+The `tasks/` it feeds are **ephemeral working scaffolding** — throwaway units for building one
+requirement's slice, **removed when that slice is finished**. The durable record of what was built and
+why lives in the **git commits/tree**, not in the task files. Decompose for execution, not for posterity.
+
 ## When to Use
 
 - A Plan is approved and needs decomposing into implementable units.
-- Work needs ordering, checkpointing, or parallelizing across sessions/agents.
+- Work needs ordering, checkpointing, or parallelizing across sessions and agents.
 - A task feels too large or vague to start.
 
 **When NOT to use:**
